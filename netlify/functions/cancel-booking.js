@@ -149,6 +149,36 @@ exports.handler = async (event) => {
     });
   }
 
+  // Notify Barbara of the cancellation
+  if (RESEND_API_KEY) {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Barbe-A-Ras <reservations@barbe-a-ras.ca>',
+        to: ['ngakambarbara@yahoo.fr'],
+        subject: `Annulation - ${resa.clients?.prenom} ${resa.clients?.nom} - ${resa.date_rdv} a ${resa.heure_rdv?.substring(0,5)}`,
+        html: `<div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #e74c3c">
+          <h2 style="color:#e74c3c">ANNULATION DE RDV</h2>
+          <p>Un client vient d annuler son rendez-vous :</p>
+          <div style="border:1px solid rgba(231,76,60,0.3);padding:20px;margin:20px 0">
+            <p><strong style="color:#C9A84C">Client :</strong> ${resa.clients?.prenom} ${resa.clients?.nom}</p>
+            <p><strong style="color:#C9A84C">Tel :</strong> ${resa.clients?.telephone||'—'}</p>
+            <p><strong style="color:#C9A84C">Date :</strong> ${resa.date_rdv}</p>
+            <p><strong style="color:#C9A84C">Heure :</strong> ${resa.heure_rdv?.substring(0,5)}</p>
+            <p><strong style="color:#C9A84C">Service :</strong> ${resa.service}</p>
+            <p><strong style="color:#C9A84C">Barbier :</strong> ${resa.barbier}</p>
+          </div>
+          <p style="font-size:13px;color:rgba(245,240,232,0.5)">Ce creneau est maintenant disponible.</p>
+          <a href="https://barbe-a-ras.ca/admin" style="display:inline-block;background:#C9A84C;color:#080808;padding:10px 25px;text-decoration:none;font-weight:700;margin-top:15px">Voir le panel admin</a>
+        </div>`
+      })
+    });
+  }
+
   return {
     statusCode: 200,
     body: JSON.stringify({ ok: true, cancelled: true })
