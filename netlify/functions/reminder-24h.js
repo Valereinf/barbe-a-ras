@@ -109,7 +109,7 @@ exports.handler = async () => {
     }
 
     // 3. Send notification email to BARBARA (staff)
-    const BARBARA_EMAIL = 'reservations@barbe-a-ras.ca';
+    const BARBARA_EMAIL = 'ngakambarbara@yahoo.fr';
     if (RESEND_API_KEY) {
       try {
         await fetch('https://api.resend.com/emails', {
