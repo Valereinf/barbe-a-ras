@@ -121,7 +121,7 @@ body{font-family:Arial,sans-serif;background:#f5f0e8;margin:0;padding:20px}
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+      from: 'Barbe-À-Ras <onboarding@resend.dev>',
       to: [email],
       subject: `✅ Rendez-vous confirmé — ${date} à ${heure} | Barbe-À-Ras`,
       html
