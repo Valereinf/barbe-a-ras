@@ -170,11 +170,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
 .confirm-screen h2{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;letter-spacing:3px;color:var(--gold);margin-bottom:0.5rem}
 .confirm-screen p{color:var(--dim);line-height:1.7;margin-bottom:0.5rem}
 .confirm-detail{background:rgba(201,168,76,0.05);border:1px solid var(--gold4);padding:1.2rem;margin:1.5rem 0;text-align:left}
-.confirm-detail .row{display:flex;justify-content:space-between;padding:0.4rem 0;
+.confirm-detail .row{display:flex;justify-content:space-between;align-items:baseline;
+  gap:1.5rem;padding:0.5rem 0;
   border-bottom:1px solid var(--gold3);font-size:0.85rem}
 .confirm-detail .row:last-child{border-bottom:none}
-.confirm-detail .row .k{color:var(--dim2)}
-.confirm-detail .row .v{color:var(--white);font-weight:500}
+.confirm-detail .row .k{color:var(--dim2);flex-shrink:0;min-width:100px}
+.confirm-detail .row .v{color:var(--white);font-weight:500;text-align:right}
 
 /* WAITLIST CONFIRM */
 .waitlist-confirm{text-align:center;padding:3rem 1.5rem}
