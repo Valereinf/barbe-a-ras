@@ -259,7 +259,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
             <span class="barber-name">Sans préférence</span>
             <span class="barber-role">Premier disponible</span>
           </div>
-          <div class="barber-card" onclick="selBarber(this,'Barbara Sandra.','Barbière principale')">
+          <div class="barber-card" onclick="selBarber(this,'Barbara San.','Barbière principale')">
             <div class="barber-avatar">BS</div>
             <span class="barber-name">Barbara</span>
             <span class="barber-role">Barbière principale</span>
@@ -533,7 +533,8 @@ const FR_D = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 let S = {
   step:'1', barber:null, svc:null, price:null, dur:null,
   date:null, time:null, month:new Date().getMonth(), year:new Date().getFullYear(),
-  bookingId:null, wlDate:null, wlTime:null, wlSvc:null, wlBarber:null
+  bookingId:null, wlDate:null, wlTime:null, wlSvc:null, wlBarber:null,
+  assignedBarber:null
 };
 
 // ═══════════════════════════════════════════
@@ -642,31 +643,45 @@ async function selDay(d, dt, el) {
 
   showOverlay('Vérification des disponibilités...');
 
-  // Fetch existing bookings for this date from Supabase
   const dateStr = dt.toISOString().split('T')[0];
-  const {data: existing} = await sb.from('reservations')
-    .select('heure_rdv')
-    .eq('date_rdv', dateStr)
-    .eq('statut', 'confirmé');
 
-  hideOverlay();
+  if(S.barber === 'Sans préférence') {
+    // Fetch booked slots for BOTH barbers separately
+    const [rMichael, rBarbara] = await Promise.all([
+      sb.from('reservations').select('heure_rdv')
+        .eq('date_rdv', dateStr).eq('barbier','Michael').eq('statut','confirmé'),
+      sb.from('reservations').select('heure_rdv')
+        .eq('date_rdv', dateStr).eq('barbier','Barbara Sandra').eq('statut','confirmé')
+    ]);
+    hideOverlay();
+    const bookedMichael = (rMichael.data||[]).map(r=>r.heure_rdv.substring(0,5));
+    const bookedBarbara = (rBarbara.data||[]).map(r=>r.heure_rdv.substring(0,5));
+    showTimesNoPreference(dt, bookedMichael, bookedBarbara);
+  } else {
+    // Specific barber selected
+    const barberName = S.barber === 'Barbara Sandra' ? 'Barbara Sandra' : 'Michael';
+    const {data: existing} = await sb.from('reservations').select('heure_rdv')
+      .eq('date_rdv', dateStr).eq('barbier', barberName).eq('statut','confirmé');
+    hideOverlay();
+    const bookedTimes = (existing||[]).map(r=>r.heure_rdv.substring(0,5));
+    showTimes(dt, bookedTimes);
+  }
+}
 
-  const bookedTimes = (existing||[]).map(r => r.heure_rdv.substring(0,5));
-  showTimes(dt, bookedTimes);
+function getAllSlots(dt) {
+  const isSat = dt.getDay()===6;
+  return isSat
+    ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']
+    : ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
 }
 
 function showTimes(dt, bookedTimes=[]) {
-  const isSat = dt.getDay()===6;
-  const allSlots = isSat
-    ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']
-    : ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
-
+  const allSlots = getAllSlots(dt);
   const available = allSlots.filter(t => !bookedTimes.includes(t));
 
   document.getElementById('date-lbl').textContent = dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
 
   if(available.length === 0) {
-    // All slots taken — show waitlist
     document.getElementById('time-sec').style.display='none';
     document.getElementById('waitlist-banner').style.display='block';
     S.wlSvc = S.svc; S.wlBarber = S.barber;
@@ -679,16 +694,74 @@ function showTimes(dt, bookedTimes=[]) {
     const unavail = bookedTimes.includes(t);
     e.className='time-slot'+(unavail?' unavail':'');
     e.textContent=t;
-    if(!unavail) e.onclick=()=>selTime(e,t);
+    if(!unavail) e.onclick=()=>selTime(e,t,S.barber);
     grid.appendChild(e);
   });
   document.getElementById('time-sec').style.display='block';
 }
 
-function selTime(el,t) {
+function showTimesNoPreference(dt, bookedMichael=[], bookedBarbara=[]) {
+  const allSlots = getAllSlots(dt);
+  document.getElementById('date-lbl').textContent = dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+
+  const freeMichael = allSlots.filter(t => !bookedMichael.includes(t));
+  const freeBarbara = allSlots.filter(t => !bookedBarbara.includes(t));
+
+  // If both fully booked — show waitlist
+  if(freeMichael.length === 0 && freeBarbara.length === 0) {
+    document.getElementById('time-sec').style.display='none';
+    document.getElementById('waitlist-banner').style.display='block';
+    S.wlSvc = S.svc; S.wlBarber = S.barber;
+    return;
+  }
+
+  const grid=document.getElementById('time-grid'); grid.innerHTML='';
+
+  // MICHAEL first
+  if(freeMichael.length > 0) {
+    const lbl = document.createElement('div');
+    lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
+    lbl.textContent = '✂ Michael — disponible';
+    grid.appendChild(lbl);
+    allSlots.forEach(t=>{
+      const e=document.createElement('div');
+      const unavail = bookedMichael.includes(t);
+      e.className='time-slot'+(unavail?' unavail':'');
+      e.textContent=t;
+      if(!unavail) e.onclick=()=>selTime(e,t,'Michael');
+      grid.appendChild(e);
+    });
+  }
+
+  // BARBARA second
+  if(freeBarbara.length > 0) {
+    const lbl2 = document.createElement('div');
+    lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
+    lbl2.textContent = '✂ Barbara Sandra — disponible';
+    grid.appendChild(lbl2);
+    allSlots.forEach(t=>{
+      const e=document.createElement('div');
+      const unavail = bookedBarbara.includes(t);
+      e.className='time-slot'+(unavail?' unavail':'');
+      e.textContent=t;
+      if(!unavail) e.onclick=()=>selTime(e,t,'Barbara Sandra');
+      grid.appendChild(e);
+    });
+  }
+
+  document.getElementById('time-sec').style.display='block';
+}
+
+function selTime(el, t, barberAssigned) {
   document.querySelectorAll('.time-slot').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
   S.time=t;
+  // If "Sans préférence", assign the barber of the chosen slot
+  if(S.barber === 'Sans préférence' && barberAssigned) {
+    S.assignedBarber = barberAssigned;
+  } else {
+    S.assignedBarber = S.barber;
+  }
   document.getElementById('b3').disabled=false;
 }
 
@@ -696,7 +769,8 @@ function selTime(el,t) {
 // STEP 4
 // ═══════════════════════════════════════════
 function updSum() {
-  document.getElementById('s-barber').textContent=S.barber||'—';
+  const barberDisplay = S.assignedBarber || S.barber;
+  document.getElementById('s-barber').textContent=barberDisplay||'—';
   document.getElementById('s-svc').textContent=S.svc||'—';
   const ds=S.date?S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' à '+S.time:'—';
   document.getElementById('s-dt').textContent=ds;
@@ -754,9 +828,10 @@ async function submitBooking() {
 
   // 3. Create reservation
   const dateStr = S.date.toISOString().split('T')[0];
+  const finalBarber = S.assignedBarber || S.barber;
   const {data: resa, error: resaErr} = await sb.from('reservations').insert({
     client_id: clientId,
-    barbier: S.barber,
+    barbier: finalBarber,
     service: S.svc,
     prix: S.price,
     date_rdv: dateStr,
@@ -776,7 +851,7 @@ async function submitBooking() {
       body: JSON.stringify({
         reservationId: resa.id,
         prenom, nom, email, tel,
-        barbier: S.barber,
+        barbier: finalBarber,
         service: S.svc,
         prix: S.price,
         date: S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
@@ -791,7 +866,7 @@ async function submitBooking() {
   // 5. Show confirmation
   const ds = S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   document.getElementById('confirm-detail').innerHTML = `
-    <div class="row"><span class="k">Barbier·ère</span><span class="v">${S.barber}</span></div>
+    <div class="row"><span class="k">Barbier·ère</span><span class="v">${finalBarber}</span></div>
     <div class="row"><span class="k">Service</span><span class="v">${S.svc}</span></div>
     <div class="row"><span class="k">Date</span><span class="v">${ds} à ${S.time}</span></div>
     <div class="row"><span class="k">Prix</span><span class="v">${S.price} + taxes</span></div>
@@ -868,7 +943,8 @@ function showToast(msg, type='') {
 }
 function resetAll() {
   S={step:'1',barber:null,svc:null,price:null,dur:null,date:null,time:null,
-     month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null};
+     month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,
+     assignedBarber:null};
   document.querySelectorAll('.barber-card,.svc-item').forEach(c=>c.classList.remove('selected'));
   ['f-prenom','f-nom','f-tel','f-email','f-note','wl-prenom','wl-nom','wl-tel','wl-email']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
