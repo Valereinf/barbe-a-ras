@@ -8,7 +8,7 @@ exports.handler = async (event) => {
   const data = JSON.parse(event.body);
   const { reservationId, prenom, nom, email, tel, barbier, service, prix, date, heure, note } = data;
 
-  // Generate cancellation token (simple but unique)
+  // Generate cancellation  token (simple but unique)
   const cancelToken = Buffer.from(`${reservationId}:${Date.now()}`).toString('base64url');
 
   // Save cancel token to Supabase
