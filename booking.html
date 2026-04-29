@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Réservation — Barbe-À-Ras</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#C9A84C;--gold2:#E8C96B;--gold3:rgba(201,168,76,0.12);
+  --gold4:rgba(201,168,76,0.35);--black:#080808;--charcoal:#131313;
+  --white:#F5F0E8;--dim:rgba(245,240,232,0.65);--dim2:rgba(245,240,232,0.35);
+  --red:#e74c3c;--green:#27ae60;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Barlow',sans-serif;background:var(--black);color:var(--white);min-height:100vh}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
+  display:flex;align-items:center;justify-content:space-between;padding:0 2rem;
+  background:rgba(8,8,8,0.97);border-bottom:1px solid var(--gold4);backdrop-filter:blur(10px)}
+.nav-back{display:flex;align-items:center;gap:0.5rem;color:var(--dim);
+  text-decoration:none;font-size:0.72rem;letter-spacing:2px;text-transform:uppercase;transition:color 0.2s}
+.nav-back:hover{color:var(--gold)}
+.nav-logo{height:46px;object-fit:contain}
+.nav-tel{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold);text-decoration:none}
+
+.page{padding:100px 1.5rem 4rem;max-width:700px;margin:0 auto}
+.page-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(2.5rem,6vw,4rem);
+  letter-spacing:3px;line-height:1;margin-bottom:0.3rem}
+.page-title .g{color:var(--gold)}
+.page-sub{font-size:0.78rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim2);margin-bottom:2rem}
+.gold-bar{width:50px;height:2px;background:var(--gold);margin-bottom:2rem}
+
+.steps{display:flex;gap:0;margin-bottom:2rem;border:1px solid var(--gold4)}
+.step{flex:1;padding:0.8rem 0.3rem;text-align:center;font-size:0.58rem;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--dim2);border-right:1px solid var(--gold4);transition:all 0.2s}
+.step:last-child{border-right:none}
+.step.active{background:var(--gold3);color:var(--gold)}
+.step.done{background:rgba(201,168,76,0.04);color:rgba(201,168,76,0.4)}
+.step .n{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;display:block;line-height:1;margin-bottom:0.15rem}
+
+.panel{background:var(--charcoal);border:1px solid var(--gold4);margin-top:1.5rem}
+.panel-head{padding:1.2rem 1.8rem;border-bottom:1px solid var(--gold4);
+  display:flex;align-items:center;justify-content:space-between}
+.panel-head h3{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px}
+.panel-body{padding:1.8rem}
+
+/* BARBERS */
+.barber-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  gap:1px;background:var(--gold4);border:1px solid var(--gold4)}
+.barber-card{background:var(--charcoal);padding:1.5rem 0.8rem;text-align:center;
+  cursor:pointer;transition:all 0.2s;border-bottom:3px solid transparent;
+  display:flex;flex-direction:column;align-items:center;gap:0.5rem}
+.barber-card:hover{background:#1a1400;border-bottom-color:var(--gold)}
+.barber-card.selected{background:#1a1400;outline:2px solid var(--gold)}
+.barber-avatar{width:64px;height:64px;border-radius:50%;background:var(--black);
+  border:2px solid var(--gold4);display:flex;align-items:center;justify-content:center;
+  font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold)}
+.barber-name{font-size:0.85rem;font-weight:600}
+.barber-role{font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--gold)}
+
+/* SERVICES */
+.svc-list{display:flex;flex-direction:column;gap:1px;background:var(--gold4)}
+.svc-cat{padding:0.6rem 1.4rem;background:rgba(201,168,76,0.06);
+  font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);
+  border-left:3px solid var(--gold)}
+.svc-item{background:var(--charcoal);display:flex;align-items:center;
+  justify-content:space-between;padding:1.1rem 1.4rem;cursor:pointer;
+  transition:background 0.2s;border-left:3px solid transparent}
+.svc-item:hover{background:#1a1400;border-left-color:var(--gold)}
+.svc-item.selected{background:#1a1400;border-left-color:var(--gold)}
+.svc-info h4{font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:1px}
+.svc-info p{font-size:0.78rem;color:var(--dim2);margin-top:0.2rem}
+.svc-meta{text-align:right;flex-shrink:0;margin-left:1rem}
+.svc-price{font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--gold)}
+.svc-dur{font-size:0.65rem;letter-spacing:1px;color:var(--dim2)}
+.svc-check{width:22px;height:22px;border:2px solid var(--gold4);border-radius:50%;
+  margin-left:0.8rem;display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;color:var(--gold);flex-shrink:0;transition:all 0.2s}
+.svc-item.selected .svc-check{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.svc-badge{font-size:0.58rem;letter-spacing:1px;background:#1a1400;
+  border:1px solid var(--gold4);padding:0.1rem 0.4rem;color:var(--dim2);
+  margin-top:0.2rem;display:inline-block}
+
+/* CALENDAR */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem}
+.cal-nav{background:none;border:1px solid var(--gold4);color:var(--white);
+  width:34px;height:34px;cursor:pointer;font-size:1rem;transition:all 0.2s;
+  display:flex;align-items:center;justify-content:center}
+.cal-nav:hover{background:var(--gold3);border-color:var(--gold)}
+.cal-month{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day-name{font-size:0.6rem;letter-spacing:2px;text-align:center;
+  color:var(--dim2);padding:0.4rem 0;text-transform:uppercase}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:0.82rem;cursor:pointer;border:1px solid transparent;transition:all 0.2s;border-radius:2px}
+.cal-day:hover:not(.empty):not(.past):not(.full){background:var(--gold3);border-color:var(--gold4)}
+.cal-day.selected{background:var(--gold);color:var(--black);font-weight:700}
+.cal-day.today{border-color:var(--gold4);color:var(--gold)}
+.cal-day.past{color:rgba(245,240,232,0.18);cursor:not-allowed}
+.cal-day.empty{cursor:default}
+.cal-day.full{color:rgba(245,240,232,0.3);cursor:pointer;position:relative}
+.cal-day.full::after{content:'•';position:absolute;bottom:2px;font-size:0.5rem;color:var(--red)}
+
+.time-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:5px;margin-top:1.2rem}
+.time-slot{padding:0.55rem 0.3rem;text-align:center;font-size:0.8rem;font-weight:500;
+  border:1px solid var(--gold4);cursor:pointer;transition:all 0.2s;position:relative}
+.time-slot:hover:not(.unavail){background:var(--gold3);border-color:var(--gold)}
+.time-slot.selected{background:var(--gold);color:var(--black);font-weight:700;border-color:var(--gold)}
+.time-slot.unavail{color:var(--dim2);cursor:not-allowed;border-color:rgba(245,240,232,0.07);text-decoration:line-through}
+
+/* WAITLIST */
+.waitlist-banner{
+  background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);
+  padding:1.2rem;margin-bottom:1.5rem;
+}
+.waitlist-banner h4{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--red);margin-bottom:0.4rem}
+.waitlist-banner p{font-size:0.85rem;color:var(--dim);line-height:1.6}
+.waitlist-btn{
+  margin-top:1rem;background:transparent;color:var(--red);
+  border:1px solid var(--red);padding:0.6rem 1.5rem;
+  font-family:'Barlow',sans-serif;font-size:0.78rem;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;
+}
+.waitlist-btn:hover{background:rgba(231,76,60,0.1)}
+
+/* POLICY */
+.policy-box{
+  background:rgba(201,168,76,0.04);
+  border:1px solid var(--gold4);
+  padding:1.5rem;margin:1.5rem 0;
+  font-size:0.82rem;line-height:1.7;color:var(--dim);
+}
+.policy-box h4{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;
+  color:var(--gold);margin-bottom:1rem}
+.policy-box ul{padding-left:1.2rem;margin-top:0.5rem}
+.policy-box ul li{margin-bottom:0.5rem}
+.policy-box strong{color:var(--white)}
+
+/* FORM */
+.summary-box{background:rgba(201,168,76,0.05);border:1px solid var(--gold4);padding:1.3rem;margin-bottom:1.3rem}
+.summary-row{display:flex;justify-content:space-between;padding:0.45rem 0;
+  border-bottom:1px solid var(--gold3);font-size:0.86rem}
+.summary-row:last-child{border-bottom:none}
+.summary-row .lbl{color:var(--dim2)}
+.summary-row .val{color:var(--white);font-weight:500;text-align:right;max-width:60%}
+.summary-total{display:flex;justify-content:space-between;padding:0.8rem 0 0;margin-top:0.5rem}
+.summary-total .lbl{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--dim)}
+.summary-total .val{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--gold)}
+
+.form-grid{display:flex;flex-direction:column;gap:1rem}
+.form-group label{display:block;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;
+  color:var(--gold);margin-bottom:0.35rem}
+.form-group input,.form-group textarea,.form-group select{
+  width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);
+  padding:0.85rem 1rem;font-family:'Barlow',sans-serif;font-size:0.93rem;
+  outline:none;transition:border-color 0.2s;resize:vertical}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--gold)}
+.form-group input::placeholder,.form-group textarea::placeholder{color:var(--dim2)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.policy-check{display:flex;gap:0.8rem;align-items:flex-start;margin-top:1rem}
+.policy-check input[type=checkbox]{width:18px;height:18px;flex-shrink:0;accent-color:var(--gold);cursor:pointer;margin-top:2px}
+.policy-check label{font-size:0.8rem;color:var(--dim2);line-height:1.5;cursor:pointer}
+
+/* CONFIRM */
+.confirm-screen{text-align:center;padding:3rem 1.5rem}
+.confirm-icon{font-size:3rem;margin-bottom:1.5rem}
+.confirm-screen h2{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;letter-spacing:3px;color:var(--gold);margin-bottom:0.5rem}
+.confirm-screen p{color:var(--dim);line-height:1.7;margin-bottom:0.5rem}
+.confirm-detail{background:rgba(201,168,76,0.05);border:1px solid var(--gold4);padding:1.2rem;margin:1.5rem 0;text-align:left}
+.confirm-detail .row{display:flex;justify-content:space-between;padding:0.4rem 0;
+  border-bottom:1px solid var(--gold3);font-size:0.85rem}
+.confirm-detail .row:last-child{border-bottom:none}
+.confirm-detail .row .k{color:var(--dim2)}
+.confirm-detail .row .v{color:var(--white);font-weight:500}
+
+/* WAITLIST CONFIRM */
+.waitlist-confirm{text-align:center;padding:3rem 1.5rem}
+.waitlist-confirm h2{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;color:var(--red);margin-bottom:1rem}
+.waitlist-confirm p{color:var(--dim);line-height:1.7;margin-bottom:0.5rem}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:1rem;margin-top:1.8rem;justify-content:space-between}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--black);
+  padding:0.95rem 2rem;border:none;font-family:'Barlow',sans-serif;font-size:0.8rem;
+  font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.2s;flex:1;text-decoration:none;display:inline-block;text-align:center}
+.btn-gold:hover{opacity:0.9;transform:translateY(-1px)}
+.btn-gold:disabled{opacity:0.3;cursor:not-allowed;transform:none}
+.btn-back{background:transparent;color:var(--dim);padding:0.95rem 1.4rem;
+  border:1px solid var(--gold4);font-family:'Barlow',sans-serif;font-size:0.78rem;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+.btn-back:hover{border-color:var(--gold);color:var(--white)}
+
+/* OVERLAY */
+.overlay{display:none;position:fixed;inset:0;background:rgba(8,8,8,0.88);
+  z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:1rem}
+.overlay.show{display:flex}
+.spinner{width:40px;height:40px;border:3px solid var(--gold4);
+  border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);
+  background:var(--charcoal);border:1px solid var(--gold4);
+  padding:0.8rem 1.5rem;font-size:0.85rem;z-index:1000;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;max-width:400px;text-align:center}
+.toast.show{opacity:1}
+.toast.error{border-color:var(--red);color:var(--red)}
+.toast.success{border-color:var(--green);color:var(--green)}
+
+@media(max-width:600px){
+  nav{padding:0 1rem}
+  .page{padding:90px 1rem 3rem}
+  .barber-grid{grid-template-columns:repeat(3,1fr)}
+  .form-row{grid-template-columns:1fr}
+  .btn-row{flex-direction:column-reverse}
+  .steps .step span:not(.n){display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="spinner"></div>
+  <span style="font-size:0.78rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold)" id="overlay-msg">Traitement en cours...</span>
+</div>
+<div class="toast" id="toast"></div>
+
+<nav>
+  <a href="index.html" class="nav-back">← Retour au site</a>
+  <img src="" alt="Barbe-À-Ras" class="nav-logo" id="nav-logo">
+  <a class="nav-tel" href="tel:4186122007">418-612-2007</a>
+</nav>
+
+<div class="page">
+  <h1 class="page-title">Prendre <span class="g">rendez-vous</span></h1>
+  <p class="page-sub">749 Rue d'Alma, Local 101 · Chicoutimi (Saguenay), QC</p>
+  <div class="gold-bar"></div>
+
+  <div class="steps" id="steps">
+    <div class="step active" id="si1"><span class="n">01</span><span>Barbier</span></div>
+    <div class="step" id="si2"><span class="n">02</span><span>Service</span></div>
+    <div class="step" id="si3"><span class="n">03</span><span>Date</span></div>
+    <div class="step" id="si4"><span class="n">04</span><span>Infos</span></div>
+    <div class="step" id="si5"><span class="n">05</span><span>Confirmer</span></div>
+  </div>
+
+  <!-- STEP 1: BARBIER -->
+  <div id="sc1">
+    <div class="panel">
+      <div class="panel-head"><h3>Choisir ton barbier·ère</h3></div>
+      <div class="panel-body">
+        <div class="barber-grid">
+          <div class="barber-card" style="background:linear-gradient(135deg,rgba(201,168,76,0.08),rgba(201,168,76,0.03))"
+            onclick="selBarber(this,'Sans préférence','Premier disponible')">
+            <div class="barber-avatar">✂</div>
+            <span class="barber-name">Sans préférence</span>
+            <span class="barber-role">Premier disponible</span>
+          </div>
+          <div class="barber-card" onclick="selBarber(this,'Barbara San.','Barbière principale')">
+            <div class="barber-avatar">BS</div>
+            <span class="barber-name">Barbara</span>
+            <span class="barber-role">Barbière principale</span>
+          </div>
+          <div class="barber-card" onclick="selBarber(this,'Michael','Barbier')">
+            <div class="barber-avatar">MK</div>
+            <span class="barber-name">Michael</span>
+            <span class="barber-role">Barbier</span>
+          </div>
+        </div>
+        <div class="btn-row" style="justify-content:flex-end">
+          <button class="btn-gold" id="b1" onclick="goStep(2)" disabled>Continuer →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: SERVICE -->
+  <div id="sc2" style="display:none">
+    <div class="panel">
+      <div class="panel-head"><h3>Choisir un service</h3></div>
+      <div class="panel-body" style="padding:0">
+        <div class="svc-list">
+          <div class="svc-cat">★ Services populaires</div>
+          <div class="svc-item" onclick="selSvc(this,'Coupe de cheveux adulte','29.50$','30min')">
+            <div class="svc-info"><h4>Coupe de cheveux adulte</h4><p>Dégradé, fondu ou ciseaux. Finition rasoir incluse.</p></div>
+            <div class="svc-meta"><div class="svc-price">29.50$</div><div class="svc-dur">+ taxes · 30 min</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-item" onclick="selSvc(this,'Coupe enfant (0-15 ans)','27.00$','30min')">
+            <div class="svc-info"><h4>Coupe enfant (0-15 ans)</h4><p>Approche douce et patiente.</p></div>
+            <div class="svc-meta"><div class="svc-price">27.00$</div><div class="svc-dur">+ taxes · 30 min</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-item" onclick="selSvc(this,'Cheveux + barbe à la lame serviette chaude','56.00$','60min')">
+            <div class="svc-info"><h4>Cheveux + barbe à la lame, serviette chaude</h4><p>Le combo premium — rasage traditionnel inclus.</p></div>
+            <div class="svc-meta"><div class="svc-price">56.00$</div><div class="svc-dur">+ taxes · 1h</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-cat">Autres services</div>
+          <div class="svc-item" onclick="selSvc(this,'Coupe + barbe au clipper','47.00$','45min')">
+            <div class="svc-info"><h4>Coupe + barbe au clipper</h4><p>Contour net, look impeccable.</p></div>
+            <div class="svc-meta"><div class="svc-price">47.00$</div><div class="svc-dur">+ taxes · 45 min</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-item" onclick="selSvc(this,'Coupe + shampoing','31.50$','30min')">
+            <div class="svc-info"><h4>Coupe + shampoing</h4><p>Lavage professionnel + coupe personnalisée.</p></div>
+            <div class="svc-meta"><div class="svc-price">31.50$</div><div class="svc-dur">+ taxes · 30 min</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-item" onclick="selSvc(this,'Barbe à la lame + serviettes chaudes','29.50$','30min')">
+            <div class="svc-info"><h4>Barbe à la lame + serviettes chaudes</h4><p>Rasage traditionnel pur.</p></div>
+            <div class="svc-meta"><div class="svc-price">29.50$</div><div class="svc-dur">+ taxes · 30 min</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-item" onclick="selSvc(this,'Cheveux + barbe lame + shampoing','59.00$','60min')">
+            <div class="svc-info"><h4>Cheveux + barbe lame + shampoing</h4><p>Tout inclus — le soin complet ultime.</p></div>
+            <div class="svc-meta"><div class="svc-price">59.00$</div><div class="svc-dur">+ taxes · 1h</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-cat">⏰ Hors heures ouvrables <span style="font-size:0.55rem;opacity:0.6">(appeler)</span></div>
+          <div class="svc-item" onclick="selSvc(this,'Coupe adulte hors heures','55.00$','30min')">
+            <div class="svc-info"><h4>Coupe adulte — hors heures</h4><div class="svc-badge">📞 Appeler au salon</div></div>
+            <div class="svc-meta"><div class="svc-price">55.00$</div><div class="svc-dur">+ taxes · 30 min</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+          <div class="svc-item" onclick="selSvc(this,'Coupe + barbe lame hors heures','105.00$','60min')">
+            <div class="svc-info"><h4>Coupe + barbe lame — hors heures</h4><div class="svc-badge">📞 Appeler au salon</div></div>
+            <div class="svc-meta"><div class="svc-price">105.00$</div><div class="svc-dur">+ taxes · 1h</div></div>
+            <div class="svc-check">✓</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body" style="border-top:1px solid var(--gold4)">
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(1)">← Retour</button>
+          <button class="btn-gold" id="b2" onclick="goStep(3)" disabled>Continuer →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: DATE & HEURE -->
+  <div id="sc3" style="display:none">
+    <div class="panel">
+      <div class="panel-head"><h3>Choisir une date & heure</h3></div>
+      <div class="panel-body">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="prevMonth()">‹</button>
+          <span class="cal-month" id="cal-lbl"></span>
+          <button class="cal-nav" onclick="nextMonth()">›</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <div id="time-sec" style="display:none;margin-top:1.5rem">
+          <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">
+            Créneaux disponibles — <span id="date-lbl"></span>
+          </div>
+          <div class="time-grid" id="time-grid"></div>
+        </div>
+
+        <!-- WAITLIST BANNER (hidden by default) -->
+        <div class="waitlist-banner" id="waitlist-banner" style="display:none">
+          <h4>🔴 Journée complète</h4>
+          <p>Tous les créneaux pour ce jour sont pris. Tu peux t'inscrire sur la liste d'attente — on te contactera si une place se libère.</p>
+          <button class="waitlist-btn" onclick="goWaitlist()">S'inscrire sur la liste d'attente</button>
+        </div>
+
+        <div class="btn-row" style="margin-top:1.8rem">
+          <button class="btn-back" onclick="goStep(2)">← Retour</button>
+          <button class="btn-gold" id="b3" onclick="goStep(4)" disabled>Continuer →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4: INFOS CLIENT -->
+  <div id="sc4" style="display:none">
+    <div class="panel">
+      <div class="panel-head"><h3>Tes coordonnées</h3></div>
+      <div class="panel-body">
+        <div class="summary-box">
+          <div class="summary-row"><span class="lbl">Barbier·ère</span><span class="val" id="s-barber">—</span></div>
+          <div class="summary-row"><span class="lbl">Service</span><span class="val" id="s-svc">—</span></div>
+          <div class="summary-row"><span class="lbl">Date & heure</span><span class="val" id="s-dt">—</span></div>
+          <div class="summary-total"><span class="lbl">Total (+ taxes)</span><span class="val" id="s-price">—</span></div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prénom *</label>
+              <input type="text" id="f-prenom" placeholder="Jean" required oninput="chkForm()">
+            </div>
+            <div class="form-group">
+              <label>Nom *</label>
+              <input type="text" id="f-nom" placeholder="Tremblay" required oninput="chkForm()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Téléphone *</label>
+            <input type="tel" id="f-tel" placeholder="418-555-0000" required oninput="chkForm()">
+          </div>
+          <div class="form-group">
+            <label>Courriel *</label>
+            <input type="email" id="f-email" placeholder="jean@exemple.com" required oninput="chkForm()">
+          </div>
+          <div class="form-group">
+            <label>Note pour le coiffeur (optionnel)</label>
+            <textarea id="f-note" rows="3" placeholder="Ex: style particulier, allergie, préférence..."></textarea>
+          </div>
+        </div>
+
+        <!-- POLITIQUE D'ANNULATION -->
+        <div class="policy-box">
+          <h4>📋 Politique du salon — À lire et accepter</h4>
+          <ul>
+            <li><strong>Annulation :</strong> Tout rendez-vous doit être annulé au moins <strong>24 heures à l'avance</strong> sans frais.</li>
+            <li><strong>Rendez-vous non honoré :</strong> Un <strong>frais de 50% du service</strong> sera facturé en cas de non-présentation sans avis.</li>
+            <li><strong>Retard :</strong> Un retard de plus de 10 minutes peut entraîner l'annulation du rendez-vous.</li>
+            <li><strong>Modes de paiement acceptés :</strong> Argent comptant · Débit Interac · Visa · Mastercard</li>
+            <li><strong>Rappel automatique :</strong> Tu recevras un rappel par SMS/courriel 24h avant ton rendez-vous.</li>
+          </ul>
+        </div>
+
+        <div class="policy-check">
+          <input type="checkbox" id="policy" onchange="chkForm()">
+          <label for="policy">J'ai lu et j'accepte la politique du salon, incluant les frais d'annulation et de non-présentation.</label>
+        </div>
+
+        <div id="blocked-msg" style="display:none;background:rgba(231,76,60,0.1);border:1px solid var(--red);padding:1rem;margin-top:1rem;font-size:0.85rem;color:var(--red)">
+          ⛔ Ce compte est actuellement suspendu. Veuillez contacter le salon au (418) 612-2007.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(3)">← Retour</button>
+          <button class="btn-gold" id="b4" onclick="submitBooking()" disabled>Confirmer le rendez-vous →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5: CONFIRMATION -->
+  <div id="sc5" style="display:none">
+    <div class="panel">
+      <div class="confirm-screen">
+        <div class="confirm-icon">✅</div>
+        <h2>Rendez-vous confirmé !</h2>
+        <div class="confirm-detail" id="confirm-detail"></div>
+        <p>Un <strong>courriel de confirmation</strong> avec un lien d'annulation a été envoyé à <span id="conf-email" style="color:var(--gold)"></span></p>
+        <p style="margin-top:0.5rem">Un <strong>rappel automatique</strong> vous sera envoyé 24h avant votre rendez-vous.</p>
+        <p style="margin-top:1rem;font-size:0.82rem;color:var(--dim2)">
+          Questions ? <a href="tel:4186122007" style="color:var(--gold);text-decoration:none;font-family:'Bebas Neue',sans-serif;letter-spacing:2px">418-612-2007</a>
+        </p>
+        <div style="margin-top:2.5rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+          <a href="index.html" class="btn-gold" style="text-decoration:none;flex:none">← Retour au site</a>
+          <button class="btn-back" onclick="resetAll()">Nouveau rendez-vous</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAITLIST FORM -->
+  <div id="sc-waitlist" style="display:none">
+    <div class="panel">
+      <div class="panel-head"><h3>Liste d'attente</h3><span style="font-size:0.65rem;color:var(--dim2)">On vous contacte si une place se libère</span></div>
+      <div class="panel-body">
+        <div class="summary-box">
+          <div class="summary-row"><span class="lbl">Service souhaité</span><span class="val" id="wl-svc">—</span></div>
+          <div class="summary-row"><span class="lbl">Barbier souhaité</span><span class="val" id="wl-barber">—</span></div>
+          <div class="summary-row"><span class="lbl">Date souhaitée</span><span class="val" id="wl-date">—</span></div>
+          <div class="summary-row"><span class="lbl">Heure souhaitée</span><span class="val" id="wl-time">—</span></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prénom *</label>
+              <input type="text" id="wl-prenom" placeholder="Jean" oninput="chkWL()">
+            </div>
+            <div class="form-group">
+              <label>Nom *</label>
+              <input type="text" id="wl-nom" placeholder="Tremblay" oninput="chkWL()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Téléphone *</label>
+            <input type="tel" id="wl-tel" placeholder="418-555-0000" oninput="chkWL()">
+          </div>
+          <div class="form-group">
+            <label>Courriel *</label>
+            <input type="email" id="wl-email" placeholder="jean@exemple.com" oninput="chkWL()">
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-back" onclick="goStep(3)">← Retour</button>
+          <button class="btn-gold" id="b-wl" onclick="submitWaitlist()" disabled>S'inscrire sur la liste →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAITLIST CONFIRMED -->
+  <div id="sc-wl-conf" style="display:none">
+    <div class="panel">
+      <div class="waitlist-confirm">
+        <div style="font-size:3rem;margin-bottom:1.5rem">🕐</div>
+        <h2>Sur la liste d'attente !</h2>
+        <p>Tu as été ajouté(e) à la liste d'attente pour le <span id="wl-conf-date" style="color:var(--gold)"></span>.</p>
+        <p style="margin-top:0.5rem">On te contactera <strong>par courriel et SMS</strong> dès qu'une place se libère.</p>
+        <div style="margin-top:2.5rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+          <a href="index.html" class="btn-gold" style="text-decoration:none;flex:none">← Retour au site</a>
+          <button class="btn-back" onclick="resetAll()">Nouvelle demande</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end .page -->
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const FR_M = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const FR_D = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+let S = {
+  step:'1', barber:null, svc:null, price:null, dur:null,
+  date:null, time:null, month:new Date().getMonth(), year:new Date().getFullYear(),
+  bookingId:null, wlDate:null, wlTime:null, wlSvc:null, wlBarber:null
+};
+
+// ═══════════════════════════════════════════
+// NAV LOGO — load from Supabase or just show text
+// ═══════════════════════════════════════════
+document.getElementById('nav-logo').style.display = 'none';
+
+// ═══════════════════════════════════════════
+// STEPS
+// ═══════════════════════════════════════════
+function goStep(n) {
+  const screens = ['sc1','sc2','sc3','sc4','sc5','sc-waitlist','sc-wl-conf'];
+  screens.forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('sc'+n).style.display='block';
+  S.step = String(n);
+  ['si1','si2','si3','si4','si5'].forEach((id,i) => {
+    const el=document.getElementById(id);
+    if(el) el.className='step'+(i+1<n?' done':i+1===n?' active':'');
+  });
+  if(n===3) renderCal();
+  if(n===4) updSum();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goWaitlist() {
+  // Show waitlist form
+  ['sc1','sc2','sc3','sc4','sc5'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('sc-waitlist').style.display='block';
+  document.getElementById('sc-wl-conf').style.display='none';
+  document.getElementById('wl-svc').textContent = S.svc||'—';
+  document.getElementById('wl-barber').textContent = S.barber||'—';
+  document.getElementById('wl-date').textContent = S.date ? S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
+  document.getElementById('wl-time').textContent = S.wlTime||'Non précisée';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════
+// STEP 1
+// ═══════════════════════════════════════════
+function selBarber(el, name, role) {
+  document.querySelectorAll('.barber-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  S.barber = name;
+  document.getElementById('b1').disabled = false;
+}
+
+// ═══════════════════════════════════════════
+// STEP 2
+// ═══════════════════════════════════════════
+function selSvc(el, name, price, dur) {
+  document.querySelectorAll('.svc-item').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  S.svc=name; S.price=price; S.dur=dur;
+  document.getElementById('b2').disabled=false;
+}
+
+// ═══════════════════════════════════════════
+// STEP 3 — CALENDAR
+// ═══════════════════════════════════════════
+function renderCal() {
+  document.getElementById('cal-lbl').textContent = FR_M[S.month]+' '+S.year;
+  const grid=document.getElementById('cal-grid'); grid.innerHTML='';
+  FR_D.forEach(d=>{ const e=document.createElement('div'); e.className='cal-day-name'; e.textContent=d; grid.appendChild(e); });
+  const first=new Date(S.year,S.month,1).getDay();
+  const days=new Date(S.year,S.month+1,0).getDate();
+  const today=new Date();
+  for(let i=0;i<first;i++){ const e=document.createElement('div'); e.className='cal-day empty'; grid.appendChild(e); }
+  for(let d=1;d<=days;d++) {
+    const e=document.createElement('div');
+    const dt=new Date(S.year,S.month,d); const dow=dt.getDay();
+    const isPast=dt<new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    const isOpen=dow>=2&&dow<=6; // Tue-Sat
+    let cls='cal-day';
+    if(isPast||!isOpen) cls+=' past';
+    if(dt.toDateString()===today.toDateString()) cls+=' today';
+    e.className=cls; e.textContent=d;
+    if(!isPast&&isOpen) e.onclick=()=>selDay(d,dt,e);
+    grid.appendChild(e);
+  }
+}
+
+function prevMonth() {
+  if(S.month===0){S.month=11;S.year--;}else S.month--;
+  S.date=null;S.time=null;
+  document.getElementById('b3').disabled=true;
+  document.getElementById('time-sec').style.display='none';
+  document.getElementById('waitlist-banner').style.display='none';
+  renderCal();
+}
+function nextMonth() {
+  if(S.month===11){S.month=0;S.year++;}else S.month++;
+  S.date=null;S.time=null;
+  document.getElementById('b3').disabled=true;
+  document.getElementById('time-sec').style.display='none';
+  document.getElementById('waitlist-banner').style.display='none';
+  renderCal();
+}
+
+async function selDay(d, dt, el) {
+  document.querySelectorAll('.cal-day').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  S.date=dt; S.time=null;
+  document.getElementById('b3').disabled=true;
+  document.getElementById('waitlist-banner').style.display='none';
+  document.getElementById('time-sec').style.display='none';
+
+  showOverlay('Vérification des disponibilités...');
+
+  // Fetch existing bookings for this date from Supabase
+  const dateStr = dt.toISOString().split('T')[0];
+  const {data: existing} = await sb.from('reservations')
+    .select('heure_rdv')
+    .eq('date_rdv', dateStr)
+    .eq('statut', 'confirmé');
+
+  hideOverlay();
+
+  const bookedTimes = (existing||[]).map(r => r.heure_rdv.substring(0,5));
+  showTimes(dt, bookedTimes);
+}
+
+function showTimes(dt, bookedTimes=[]) {
+  const isSat = dt.getDay()===6;
+  const allSlots = isSat
+    ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']
+    : ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+
+  const available = allSlots.filter(t => !bookedTimes.includes(t));
+
+  document.getElementById('date-lbl').textContent = dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+
+  if(available.length === 0) {
+    // All slots taken — show waitlist
+    document.getElementById('time-sec').style.display='none';
+    document.getElementById('waitlist-banner').style.display='block';
+    S.wlSvc = S.svc; S.wlBarber = S.barber;
+    return;
+  }
+
+  const grid=document.getElementById('time-grid'); grid.innerHTML='';
+  allSlots.forEach(t=>{
+    const e=document.createElement('div');
+    const unavail = bookedTimes.includes(t);
+    e.className='time-slot'+(unavail?' unavail':'');
+    e.textContent=t;
+    if(!unavail) e.onclick=()=>selTime(e,t);
+    grid.appendChild(e);
+  });
+  document.getElementById('time-sec').style.display='block';
+}
+
+function selTime(el,t) {
+  document.querySelectorAll('.time-slot').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  S.time=t;
+  document.getElementById('b3').disabled=false;
+}
+
+// ═══════════════════════════════════════════
+// STEP 4
+// ═══════════════════════════════════════════
+function updSum() {
+  document.getElementById('s-barber').textContent=S.barber||'—';
+  document.getElementById('s-svc').textContent=S.svc||'—';
+  const ds=S.date?S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' à '+S.time:'—';
+  document.getElementById('s-dt').textContent=ds;
+  document.getElementById('s-price').textContent=S.price||'—';
+}
+
+function chkForm() {
+  const ok=document.getElementById('f-prenom').value.trim()&&
+    document.getElementById('f-nom').value.trim()&&
+    document.getElementById('f-tel').value.trim()&&
+    document.getElementById('f-email').value.trim()&&
+    document.getElementById('policy').checked;
+  document.getElementById('b4').disabled=!ok;
+}
+
+// ═══════════════════════════════════════════
+// SUBMIT BOOKING
+// ═══════════════════════════════════════════
+async function submitBooking() {
+  const prenom = document.getElementById('f-prenom').value.trim();
+  const nom = document.getElementById('f-nom').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const tel = document.getElementById('f-tel').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+
+  showOverlay('Vérification du compte...');
+
+  // 1. Check if client exists and if blocked
+  const {data: existingClient} = await sb.from('clients')
+    .select('id, est_bloque, prenom, nom')
+    .eq('email', email)
+    .single();
+
+  if(existingClient?.est_bloque) {
+    hideOverlay();
+    document.getElementById('blocked-msg').style.display='block';
+    document.getElementById('b4').disabled=true;
+    return;
+  }
+
+  showOverlay('Enregistrement du rendez-vous...');
+
+  // 2. Upsert client
+  let clientId = existingClient?.id;
+  if(!clientId) {
+    const {data: newClient, error: clientErr} = await sb.from('clients')
+      .insert({prenom, nom, email, telephone: tel})
+      .select('id').single();
+    if(clientErr) { hideOverlay(); showToast('Erreur réseau. Réessayez.','error'); return; }
+    clientId = newClient.id;
+  } else {
+    // Update phone if changed
+    await sb.from('clients').update({telephone:tel}).eq('id', clientId);
+  }
+
+  // 3. Create reservation
+  const dateStr = S.date.toISOString().split('T')[0];
+  const {data: resa, error: resaErr} = await sb.from('reservations').insert({
+    client_id: clientId,
+    barbier: S.barber,
+    service: S.svc,
+    prix: S.price,
+    date_rdv: dateStr,
+    heure_rdv: S.time,
+    statut: 'confirmé',
+    note_client: note
+  }).select('id').single();
+
+  if(resaErr) { hideOverlay(); showToast('Erreur lors de la réservation. Veuillez réessayer.','error'); return; }
+  S.bookingId = resa.id;
+
+  // 4. Send confirmation email via Netlify Function
+  try {
+    await fetch('/.netlify/functions/send-confirmation', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        reservationId: resa.id,
+        prenom, nom, email, tel,
+        barbier: S.barber,
+        service: S.svc,
+        prix: S.price,
+        date: S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+        heure: S.time,
+        note
+      })
+    });
+  } catch(e) { /* email error non-blocking */ }
+
+  hideOverlay();
+
+  // 5. Show confirmation
+  const ds = S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('confirm-detail').innerHTML = `
+    <div class="row"><span class="k">Barbier·ère</span><span class="v">${S.barber}</span></div>
+    <div class="row"><span class="k">Service</span><span class="v">${S.svc}</span></div>
+    <div class="row"><span class="k">Date</span><span class="v">${ds} à ${S.time}</span></div>
+    <div class="row"><span class="k">Prix</span><span class="v">${S.price} + taxes</span></div>
+    ${note ? `<div class="row"><span class="k">Note</span><span class="v">${note}</span></div>` : ''}
+    <div class="row"><span class="k">Réf.</span><span class="v" style="font-size:0.75rem;color:var(--dim2)">#${resa.id.substring(0,8).toUpperCase()}</span></div>
+  `;
+  document.getElementById('conf-email').textContent = email;
+  goStep(5);
+}
+
+// ═══════════════════════════════════════════
+// WAITLIST
+// ═══════════════════════════════════════════
+function chkWL() {
+  const ok = document.getElementById('wl-prenom').value.trim()&&
+    document.getElementById('wl-nom').value.trim()&&
+    document.getElementById('wl-tel').value.trim()&&
+    document.getElementById('wl-email').value.trim();
+  document.getElementById('b-wl').disabled=!ok;
+}
+
+async function submitWaitlist() {
+  const prenom = document.getElementById('wl-prenom').value.trim();
+  const nom = document.getElementById('wl-nom').value.trim();
+  const email = document.getElementById('wl-email').value.trim();
+  const tel = document.getElementById('wl-tel').value.trim();
+
+  showOverlay('Inscription en cours...');
+
+  // Upsert client
+  let clientId;
+  const {data: existing} = await sb.from('clients').select('id').eq('email',email).single();
+  if(existing) {
+    clientId=existing.id;
+  } else {
+    const {data:nc} = await sb.from('clients').insert({prenom,nom,email,telephone:tel}).select('id').single();
+    clientId=nc?.id;
+  }
+
+  const dateStr = S.date ? S.date.toISOString().split('T')[0] : null;
+  await sb.from('liste_attente').insert({
+    client_id: clientId,
+    service: S.svc||'Non précisé',
+    barbier: S.barber||'Sans préférence',
+    date_souhaitee: dateStr,
+    heure_souhaitee: '09:00',
+    statut: 'en_attente'
+  });
+
+  hideOverlay();
+
+  // Show waitlist confirmation
+  ['sc-waitlist'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('sc-wl-conf').style.display='block';
+  const ds = S.date ? S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'la date choisie';
+  document.getElementById('wl-conf-date').textContent = ds;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════
+function showOverlay(msg) {
+  document.getElementById('overlay-msg').textContent = msg||'Traitement...';
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay() {
+  document.getElementById('overlay').classList.remove('show');
+}
+function showToast(msg, type='') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.className='toast',3500);
+}
+function resetAll() {
+  S={step:'1',barber:null,svc:null,price:null,dur:null,date:null,time:null,
+     month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null};
+  document.querySelectorAll('.barber-card,.svc-item').forEach(c=>c.classList.remove('selected'));
+  ['f-prenom','f-nom','f-tel','f-email','f-note','wl-prenom','wl-nom','wl-tel','wl-email']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const p=document.getElementById('policy'); if(p) p.checked=false;
+  ['b1','b2','b3','b4'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  document.getElementById('blocked-msg').style.display='none';
+  goStep(1);
+}
+</script>
+</body>
+</html>

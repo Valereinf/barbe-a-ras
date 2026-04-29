@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Barbe-À-Ras</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#C9A84C;--gold2:#E8C96B;--gold3:rgba(201,168,76,0.12);--gold4:rgba(201,168,76,0.3);
+  --black:#080808;--charcoal:#131313;--dark:#0e0e0e;
+  --white:#F5F0E8;--dim:rgba(245,240,232,0.65);--dim2:rgba(245,240,232,0.35);
+  --red:#e74c3c;--green:#27ae60;--blue:#3498db;
+}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);color:var(--white)}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;
+  background:linear-gradient(135deg,var(--black),#1a1400)}
+.login-card{background:var(--charcoal);border:1px solid var(--gold4);padding:3rem 2.5rem;
+  max-width:400px;width:100%;text-align:center}
+.login-card h1{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;
+  color:var(--gold);margin-bottom:0.3rem}
+.login-card p{font-size:0.78rem;letter-spacing:2px;color:var(--dim2);
+  text-transform:uppercase;margin-bottom:2rem}
+.login-card input{width:100%;background:var(--black);border:1px solid var(--gold4);
+  color:var(--white);padding:0.9rem 1rem;font-family:'Barlow',sans-serif;font-size:1rem;
+  outline:none;transition:border-color 0.2s;text-align:center;letter-spacing:3px;
+  margin-bottom:1rem}
+.login-card input:focus{border-color:var(--gold)}
+.login-card button{width:100%;background:var(--gold);color:var(--black);border:none;
+  padding:1rem;font-family:'Barlow',sans-serif;font-size:0.85rem;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:background 0.2s}
+.login-card button:hover{background:var(--gold2)}
+.login-err{color:var(--red);font-size:0.8rem;margin-top:0.8rem;display:none}
+
+/* LAYOUT */
+.app{display:none;height:100vh;flex-direction:column}
+.topbar{height:60px;background:var(--charcoal);border-bottom:1px solid var(--gold4);
+  display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;flex-shrink:0}
+.topbar h1{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:3px;color:var(--gold)}
+.topbar-right{display:flex;align-items:center;gap:1rem}
+.badge{background:var(--red);color:#fff;font-size:0.65rem;padding:0.15rem 0.4rem;
+  border-radius:10px;font-weight:700}
+.logout{background:none;border:1px solid var(--gold4);color:var(--dim2);
+  padding:0.4rem 0.8rem;cursor:pointer;font-size:0.72rem;letter-spacing:1px;
+  text-transform:uppercase;transition:all 0.2s}
+.logout:hover{border-color:var(--gold);color:var(--white)}
+
+.main{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:200px;background:var(--dark);border-right:1px solid var(--gold4);
+  display:flex;flex-direction:column;flex-shrink:0}
+.nav-item{padding:0.9rem 1.2rem;cursor:pointer;font-size:0.75rem;letter-spacing:2px;
+  text-transform:uppercase;color:var(--dim2);border-left:3px solid transparent;
+  transition:all 0.2s;display:flex;align-items:center;gap:0.6rem}
+.nav-item:hover{background:var(--gold3);color:var(--white)}
+.nav-item.active{background:var(--gold3);color:var(--gold);border-left-color:var(--gold)}
+.nav-item .ico{font-size:1rem;flex-shrink:0}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:1.5rem}
+
+/* PANELS */
+.tab{display:none}
+.tab.active{display:block}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
+.stat-card{background:var(--charcoal);border:1px solid var(--gold4);padding:1.2rem;text-align:center}
+.stat-card .num{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--gold);line-height:1}
+.stat-card .lbl{font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);margin-top:0.3rem}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+.data-table th{font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;
+  text-align:left;padding:0.8rem 1rem;border-bottom:2px solid var(--gold4);
+  color:var(--gold);background:rgba(201,168,76,0.05)}
+.data-table td{padding:0.75rem 1rem;border-bottom:1px solid rgba(201,168,76,0.07);vertical-align:middle}
+.data-table tr:hover td{background:rgba(201,168,76,0.04)}
+.status-badge{display:inline-block;padding:0.15rem 0.5rem;font-size:0.65rem;
+  letter-spacing:1px;text-transform:uppercase;font-weight:600}
+.status-confirmé{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
+.status-annulé{background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3)}
+.status-en_attente{background:rgba(52,152,219,0.1);color:var(--blue);border:1px solid rgba(52,152,219,0.3)}
+.status-notifié{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
+.blocked-row td{opacity:0.5}
+.blocked-row td:first-child::before{content:'⛔ ';opacity:1}
+
+/* BUTTONS */
+.btn-sm{padding:0.3rem 0.7rem;font-size:0.68rem;letter-spacing:1px;text-transform:uppercase;
+  font-weight:600;cursor:pointer;transition:all 0.2s;border:none;font-family:'Barlow',sans-serif}
+.btn-danger{background:rgba(231,76,60,0.15);color:var(--red);border:1px solid rgba(231,76,60,0.3)}
+.btn-danger:hover{background:rgba(231,76,60,0.3)}
+.btn-success{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
+.btn-success:hover{background:rgba(39,174,96,0.3)}
+.btn-gold-sm{background:var(--gold);color:var(--black);border:none}
+.btn-gold-sm:hover{background:var(--gold2)}
+.btn-info{background:rgba(52,152,219,0.15);color:var(--blue);border:1px solid rgba(52,152,219,0.3)}
+.btn-info:hover{background:rgba(52,152,219,0.3)}
+
+/* SECTION HEADER */
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+.sec-head h2{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2px}
+.sec-head h2 span{color:var(--gold)}
+.search-input{background:var(--black);border:1px solid var(--gold4);color:var(--white);
+  padding:0.55rem 1rem;font-family:'Barlow',sans-serif;font-size:0.85rem;outline:none;
+  min-width:220px;transition:border-color 0.2s}
+.search-input:focus{border-color:var(--gold)}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;
+  align-items:center;justify-content:center;padding:1.5rem}
+.modal-bg.open{display:flex}
+.modal{background:var(--charcoal);border:1px solid var(--gold4);max-width:540px;width:100%;
+  max-height:85vh;overflow-y:auto}
+.modal-head{padding:1.2rem 1.5rem;border-bottom:1px solid var(--gold4);
+  display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px}
+.modal-close{background:none;border:none;color:var(--dim2);font-size:1.4rem;cursor:pointer;
+  transition:color 0.2s;line-height:1}
+.modal-close:hover{color:var(--white)}
+.modal-body{padding:1.5rem}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;
+  color:var(--gold);margin-bottom:0.35rem}
+.field input,.field textarea,.field select{width:100%;background:var(--black);
+  border:1px solid var(--gold4);color:var(--white);padding:0.75rem 0.9rem;
+  font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none;transition:border-color 0.2s;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--gold)}
+.field .val-display{padding:0.6rem 0;font-size:0.9rem;color:var(--white)}
+.info-row{display:flex;justify-content:space-between;padding:0.5rem 0;
+  border-bottom:1px solid rgba(201,168,76,0.08);font-size:0.87rem}
+.info-row .k{color:var(--dim2)}
+.info-row .v{color:var(--white);font-weight:500;text-align:right}
+.modal-footer{padding:1rem 1.5rem;border-top:1px solid var(--gold4);
+  display:flex;gap:0.8rem;justify-content:flex-end}
+
+/* DATE FILTER */
+.filter-bar{display:flex;gap:1rem;margin-bottom:1.5rem;align-items:center;flex-wrap:wrap}
+.filter-bar input[type=date]{background:var(--black);border:1px solid var(--gold4);
+  color:var(--white);padding:0.5rem 0.8rem;font-family:'Barlow',sans-serif;
+  font-size:0.85rem;outline:none;cursor:pointer}
+.filter-btn{padding:0.5rem 1rem;background:var(--gold3);border:1px solid var(--gold4);
+  color:var(--dim);font-size:0.72rem;letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;transition:all 0.2s}
+.filter-btn.active,.filter-btn:hover{background:var(--gold);color:var(--black);border-color:var(--gold)}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:3rem;color:var(--dim2);font-size:0.9rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:2rem;right:2rem;background:var(--charcoal);
+  border:1px solid var(--gold4);padding:0.8rem 1.5rem;font-size:0.85rem;
+  z-index:1000;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.err{border-color:var(--red);color:var(--red)}
+.toast.ok{border-color:var(--green);color:var(--green)}
+
+/* NOTES HISTORY */
+.note-entry{background:rgba(201,168,76,0.04);border-left:3px solid var(--gold4);
+  padding:0.8rem 1rem;margin-bottom:0.7rem;font-size:0.85rem}
+.note-entry .meta{font-size:0.65rem;letter-spacing:1px;color:var(--dim2);
+  text-transform:uppercase;margin-bottom:0.3rem}
+.note-entry .txt{color:var(--dim);line-height:1.5}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .stats-row{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <h1>BARBE-À-RAS</h1>
+    <p>Panel administrateur</p>
+    <input type="password" id="pwd-input" placeholder="••••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Accéder →</button>
+    <p class="login-err" id="login-err">Mot de passe incorrect</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="topbar">
+    <h1>✂ BARBE-À-RAS <span style="color:var(--dim2);font-size:0.9rem;letter-spacing:1px"> · ADMIN</span></h1>
+    <div class="topbar-right">
+      <span style="font-size:0.75rem;color:var(--dim2)" id="today-label"></span>
+      <span class="badge" id="waitlist-badge" style="display:none">0</span>
+      <button class="logout" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="nav-item active" onclick="showTab('dashboard')" id="nav-dashboard">
+        <span class="ico">📊</span>Tableau de bord
+      </div>
+      <div class="nav-item" onclick="showTab('reservations')" id="nav-reservations">
+        <span class="ico">📅</span>Réservations
+      </div>
+      <div class="nav-item" onclick="showTab('clients')" id="nav-clients">
+        <span class="ico">👤</span>Clients
+      </div>
+      <div class="nav-item" onclick="showTab('waitlist')" id="nav-waitlist">
+        <span class="ico">🕐</span>Liste d'attente
+      </div>
+      <div class="nav-item" onclick="showTab('blocked')" id="nav-blocked">
+        <span class="ico">⛔</span>Clients bloqués
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="tab active" id="tab-dashboard">
+        <div class="sec-head">
+          <h2>Tableau de <span>bord</span></h2>
+          <button class="btn-sm btn-gold-sm" onclick="loadAll()">↻ Actualiser</button>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="num" id="stat-today">–</div><div class="lbl">RDV aujourd'hui</div></div>
+          <div class="stat-card"><div class="num" id="stat-week">–</div><div class="lbl">RDV cette semaine</div></div>
+          <div class="stat-card"><div class="num" id="stat-clients">–</div><div class="lbl">Clients total</div></div>
+          <div class="stat-card"><div class="num" id="stat-waitlist">–</div><div class="lbl">En attente</div></div>
+        </div>
+
+        <h3 style="font-family:'Bebas Neue',sans-serif;letter-spacing:2px;color:var(--gold);margin-bottom:1rem">RDV D'AUJOURD'HUI</h3>
+        <div id="today-list"><div class="empty">Chargement...</div></div>
+      </div>
+
+      <!-- RESERVATIONS -->
+      <div class="tab" id="tab-reservations">
+        <div class="sec-head">
+          <h2>Toutes les <span>réservations</span></h2>
+        </div>
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="filterResa('all',this)">Toutes</button>
+          <button class="filter-btn" onclick="filterResa('confirmé',this)">Confirmées</button>
+          <button class="filter-btn" onclick="filterResa('annulé',this)">Annulées</button>
+          <input type="date" id="filter-date" onchange="filterByDate(this.value)">
+          <input class="search-input" type="text" placeholder="Chercher nom / service..." oninput="searchResa(this.value)">
+        </div>
+        <table class="data-table" id="resa-table">
+          <thead><tr>
+            <th>Date</th><th>Heure</th><th>Client</th><th>Service</th>
+            <th>Barbier</th><th>Prix</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="resa-tbody"><tr><td colspan="8" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- CLIENTS -->
+      <div class="tab" id="tab-clients">
+        <div class="sec-head">
+          <h2>Gestion des <span>clients</span></h2>
+          <input class="search-input" type="text" placeholder="Chercher nom / email / tél..." oninput="searchClients(this.value)" id="client-search">
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Nom</th><th>Téléphone</th><th>Courriel</th>
+            <th>Inscrit le</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="clients-tbody"><tr><td colspan="6" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- WAITLIST -->
+      <div class="tab" id="tab-waitlist">
+        <div class="sec-head">
+          <h2>Liste d'<span>attente</span></h2>
+          <button class="btn-sm btn-gold-sm" onclick="loadWaitlist()">↻ Actualiser</button>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Client</th><th>Service</th><th>Date souhaitée</th>
+            <th>Barbier</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="waitlist-tbody"><tr><td colspan="6" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- BLOCKED -->
+      <div class="tab" id="tab-blocked">
+        <div class="sec-head">
+          <h2>Clients <span>bloqués</span></h2>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Nom</th><th>Courriel</th><th>Raison</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="blocked-tbody"><tr><td colspan="4" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CLIENT DETAIL -->
+<div class="modal-bg" id="modal-client">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-client-name">Fiche client</h3>
+      <button class="modal-close" onclick="closeModal('modal-client')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-client-body"></div>
+    <div class="modal-footer" id="modal-client-footer"></div>
+  </div>
+</div>
+
+<!-- MODAL: RDV DETAIL -->
+<div class="modal-bg" id="modal-resa">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Détail du rendez-vous</h3>
+      <button class="modal-close" onclick="closeModal('modal-resa')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-resa-body"></div>
+    <div class="modal-footer" id="modal-resa-footer"></div>
+  </div>
+</div>
+
+<!-- MODAL: BLOCK CLIENT -->
+<div class="modal-bg" id="modal-block">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="color:var(--red)">⛔ Bloquer ce client</h3>
+      <button class="modal-close" onclick="closeModal('modal-block')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:1rem;color:var(--dim);font-size:0.9rem">
+        Ce client ne pourra plus effectuer de réservation en ligne.
+      </p>
+      <div class="field">
+        <label>Raison du blocage *</label>
+        <textarea id="block-reason" rows="3" placeholder="Ex: non-présentation répétée, comportement inapproprié..."></textarea>
+      </div>
+      <input type="hidden" id="block-client-id">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+        onclick="closeModal('modal-block')">Annuler</button>
+      <button class="btn-sm btn-danger" onclick="confirmBlock()">⛔ Confirmer le blocage</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG & STATE
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const ADMIN_PWD = 'Always6Win3';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allResa = [], allClients = [], allWaitlist = [];
+let currentFilter = 'all';
+
+// ═══════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════
+function doLogin() {
+  const pwd = document.getElementById('pwd-input').value;
+  if(pwd === ADMIN_PWD) {
+    document.getElementById('login-wrap').style.display='none';
+    document.getElementById('app').style.display='flex';
+    sessionStorage.setItem('bar_auth','1');
+    initApp();
+  } else {
+    document.getElementById('login-err').style.display='block';
+    document.getElementById('pwd-input').value='';
+  }
+}
+function doLogout() {
+  sessionStorage.removeItem('bar_auth');
+  location.reload();
+}
+// Auto-login if session active
+if(sessionStorage.getItem('bar_auth')==='1') {
+  document.getElementById('login-wrap').style.display='none';
+  document.getElementById('app').style.display='flex';
+  initApp();
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+function initApp() {
+  const now = new Date();
+  document.getElementById('today-label').textContent =
+    now.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+  loadAll();
+}
+
+async function loadAll() {
+  await Promise.all([loadReservations(), loadClients(), loadWaitlist()]);
+  updateStats();
+  loadTodayList();
+}
+
+// ═══════════════════════════════════════════
+// DATA LOADERS
+// ═══════════════════════════════════════════
+async function loadReservations() {
+  const {data} = await sb.from('reservations')
+    .select('*, clients(id,prenom,nom,email,telephone,est_bloque)')
+    .order('date_rdv',{ascending:false})
+    .order('heure_rdv',{ascending:true});
+  allResa = data||[];
+  renderResa(allResa);
+}
+
+async function loadClients() {
+  const {data} = await sb.from('clients')
+    .select('*')
+    .order('created_at',{ascending:false});
+  allClients = data||[];
+  renderClients(allClients);
+  renderBlocked(allClients.filter(c=>c.est_bloque));
+  document.getElementById('stat-clients').textContent = allClients.length;
+}
+
+async function loadWaitlist() {
+  const {data} = await sb.from('liste_attente')
+    .select('*, clients(prenom,nom,email,telephone)')
+    .order('created_at',{ascending:true});
+  allWaitlist = data||[];
+  renderWaitlist(allWaitlist);
+  const pending = allWaitlist.filter(w=>w.statut==='en_attente').length;
+  document.getElementById('stat-waitlist').textContent = pending;
+  const badge = document.getElementById('waitlist-badge');
+  if(pending>0){badge.textContent=pending;badge.style.display='inline';}
+  else{badge.style.display='none';}
+}
+
+// ═══════════════════════════════════════════
+// STATS & TODAY
+// ═══════════════════════════════════════════
+function updateStats() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate()-weekStart.getDay());
+  const weekStr = weekStart.toISOString().split('T')[0];
+
+  const todayResa = allResa.filter(r=>r.date_rdv===todayStr&&r.statut==='confirmé');
+  const weekResa = allResa.filter(r=>r.date_rdv>=weekStr&&r.statut==='confirmé');
+  document.getElementById('stat-today').textContent = todayResa.length;
+  document.getElementById('stat-week').textContent = weekResa.length;
+}
+
+function loadTodayList() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayResa = allResa
+    .filter(r=>r.date_rdv===todayStr&&r.statut==='confirmé')
+    .sort((a,b)=>a.heure_rdv.localeCompare(b.heure_rdv));
+  const el = document.getElementById('today-list');
+  if(todayResa.length===0){
+    el.innerHTML='<div class="empty">Aucun rendez-vous aujourd\'hui</div>'; return;
+  }
+  el.innerHTML = todayResa.map(r=>`
+    <div style="background:var(--charcoal);border:1px solid var(--gold4);padding:1rem;margin-bottom:0.7rem;
+      display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <div>
+        <strong style="font-size:1.1rem;color:var(--gold);font-family:'Bebas Neue',sans-serif;letter-spacing:2px">
+          ${r.heure_rdv?.substring(0,5)}
+        </strong>
+        <span style="margin-left:1rem;font-size:0.9rem">${r.clients?.prenom} ${r.clients?.nom}</span>
+      </div>
+      <div style="font-size:0.85rem;color:var(--dim2)">${r.service} · ${r.barbier}</div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn-sm btn-info" onclick="openResaModal('${r.id}')">Voir</button>
+        <button class="btn-sm btn-danger" onclick="cancelResa('${r.id}')">Annuler</button>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// RENDER TABLES
+// ═══════════════════════════════════════════
+function renderResa(data) {
+  const tbody = document.getElementById('resa-tbody');
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="8" class="empty">Aucune réservation</td></tr>';return;}
+  tbody.innerHTML = data.map(r=>`
+    <tr>
+      <td>${r.date_rdv||'—'}</td>
+      <td>${r.heure_rdv?.substring(0,5)||'—'}</td>
+      <td>
+        <div>${r.clients?.prenom||''} ${r.clients?.nom||''}</div>
+        <div style="font-size:0.75rem;color:var(--dim2)">${r.clients?.telephone||''}</div>
+      </td>
+      <td style="max-width:180px;font-size:0.82rem">${r.service||'—'}</td>
+      <td>${r.barbier||'—'}</td>
+      <td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${r.prix||'—'}</td>
+      <td><span class="status-badge status-${r.statut}">${r.statut}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-info" style="margin-right:4px" onclick="openResaModal('${r.id}')">Voir</button>
+        ${r.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${r.id}')">Annuler</button>`:''}
+      </td>
+    </tr>`).join('');
+}
+
+function renderClients(data) {
+  const tbody = document.getElementById('clients-tbody');
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" class="empty">Aucun client</td></tr>';return;}
+  tbody.innerHTML = data.map(c=>`
+    <tr class="${c.est_bloque?'blocked-row':''}">
+      <td><strong>${c.prenom} ${c.nom}</strong></td>
+      <td>${c.telephone||'—'}</td>
+      <td style="font-size:0.82rem">${c.email||'—'}</td>
+      <td style="font-size:0.78rem;color:var(--dim2)">${c.created_at?.split('T')[0]||'—'}</td>
+      <td>${c.est_bloque
+        ?'<span class="status-badge status-annulé">Bloqué</span>'
+        :'<span class="status-badge status-confirmé">Actif</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-info" style="margin-right:4px" onclick="openClientModal('${c.id}')">Fiche</button>
+        ${c.est_bloque
+          ?`<button class="btn-sm btn-success" onclick="unblockClient('${c.id}')">Débloquer</button>`
+          :`<button class="btn-sm btn-danger" onclick="openBlockModal('${c.id}','${c.prenom} ${c.nom}')">Bloquer</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+function renderBlocked(data) {
+  const tbody = document.getElementById('blocked-tbody');
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="4" class="empty">Aucun client bloqué</td></tr>';return;}
+  tbody.innerHTML = data.map(c=>`
+    <tr>
+      <td><strong>${c.prenom} ${c.nom}</strong></td>
+      <td style="font-size:0.82rem">${c.email||'—'}</td>
+      <td style="font-size:0.82rem;color:var(--dim2)">${c.raison_blocage||'—'}</td>
+      <td><button class="btn-sm btn-success" onclick="unblockClient('${c.id}')">Débloquer</button></td>
+    </tr>`).join('');
+}
+
+function renderWaitlist(data) {
+  const tbody = document.getElementById('waitlist-tbody');
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" class="empty">Liste d\'attente vide</td></tr>';return;}
+  tbody.innerHTML = data.map(w=>`
+    <tr>
+      <td><strong>${w.clients?.prenom||''} ${w.clients?.nom||''}</strong>
+        <div style="font-size:0.75rem;color:var(--dim2)">${w.clients?.email||''}</div></td>
+      <td style="font-size:0.82rem">${w.service||'—'}</td>
+      <td>${w.date_souhaitee||'—'}</td>
+      <td>${w.barbier||'—'}</td>
+      <td><span class="status-badge status-${w.statut}">${w.statut}</span></td>
+      <td><button class="btn-sm btn-danger" onclick="removeWaitlist('${w.id}')">Retirer</button></td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// FILTERS & SEARCH
+// ═══════════════════════════════════════════
+function filterResa(status, btn) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('filter-date').value='';
+  const filtered = status==='all' ? allResa : allResa.filter(r=>r.statut===status);
+  renderResa(filtered);
+}
+function filterByDate(val) {
+  if(!val){renderResa(allResa);return;}
+  renderResa(allResa.filter(r=>r.date_rdv===val));
+}
+function searchResa(q) {
+  if(!q){filterResa(currentFilter);return;}
+  const lq=q.toLowerCase();
+  renderResa(allResa.filter(r=>
+    (r.clients?.prenom+' '+r.clients?.nom).toLowerCase().includes(lq)||
+    r.service?.toLowerCase().includes(lq)||
+    r.barbier?.toLowerCase().includes(lq)
+  ));
+}
+function searchClients(q) {
+  if(!q){renderClients(allClients);return;}
+  const lq=q.toLowerCase();
+  renderClients(allClients.filter(c=>
+    (c.prenom+' '+c.nom).toLowerCase().includes(lq)||
+    c.email?.toLowerCase().includes(lq)||
+    c.telephone?.includes(lq)
+  ));
+}
+
+// ═══════════════════════════════════════════
+// RESERVATION ACTIONS
+// ═══════════════════════════════════════════
+async function cancelResa(id) {
+  if(!confirm('Annuler ce rendez-vous ?')) return;
+  await sb.from('reservations').update({statut:'annulé'}).eq('id',id);
+  showToast('Rendez-vous annulé','ok');
+  loadAll();
+}
+
+async function openResaModal(id) {
+  const resa = allResa.find(r=>r.id===id);
+  if(!resa) return;
+  const client = resa.clients||{};
+
+  // Load staff notes for this reservation
+  document.getElementById('modal-resa-body').innerHTML = `
+    <div style="margin-bottom:1.5rem">
+      <div class="info-row"><span class="k">Client</span><span class="v">${client.prenom||''} ${client.nom||''}</span></div>
+      <div class="info-row"><span class="k">Téléphone</span><span class="v">${client.telephone||'—'}</span></div>
+      <div class="info-row"><span class="k">Courriel</span><span class="v">${client.email||'—'}</span></div>
+      <div class="info-row"><span class="k">Service</span><span class="v">${resa.service||'—'}</span></div>
+      <div class="info-row"><span class="k">Barbier·ère</span><span class="v">${resa.barbier||'—'}</span></div>
+      <div class="info-row"><span class="k">Date</span><span class="v">${resa.date_rdv||'—'}</span></div>
+      <div class="info-row"><span class="k">Heure</span><span class="v">${resa.heure_rdv?.substring(0,5)||'—'}</span></div>
+      <div class="info-row"><span class="k">Prix</span><span class="v">${resa.prix||'—'} + taxes</span></div>
+      <div class="info-row"><span class="k">Statut</span><span class="v"><span class="status-badge status-${resa.statut}">${resa.statut}</span></span></div>
+      <div class="info-row"><span class="k">Rappel envoyé</span><span class="v">${resa.rappel_envoye?'✅ Oui':'⏳ Non'}</span></div>
+    </div>
+    ${resa.note_client?`
+    <div style="margin-bottom:1.5rem">
+      <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem">Note du client</div>
+      <div style="background:rgba(201,168,76,0.05);border-left:3px solid var(--gold4);padding:0.8rem;font-size:0.87rem;color:var(--dim)">
+        ${resa.note_client}
+      </div>
+    </div>`:''}
+    <div>
+      <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem">Note interne staff (visible staff uniquement)</div>
+      <textarea id="staff-note-input" rows="3" style="width:100%;background:var(--black);
+        border:1px solid var(--gold4);color:var(--white);padding:0.75rem;font-family:'Barlow',sans-serif;
+        font-size:0.9rem;outline:none;resize:vertical"
+        placeholder="Ajouter une note de travail...">${resa.note_staff||''}</textarea>
+    </div>`;
+
+  document.getElementById('modal-resa-footer').innerHTML = `
+    <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+      onclick="closeModal('modal-resa')">Fermer</button>
+    <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
+    ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
+  `;
+
+  document.getElementById('modal-resa').classList.add('open');
+}
+
+async function saveStaffNote(resaId) {
+  const note = document.getElementById('staff-note-input').value.trim();
+  await sb.from('reservations').update({note_staff:note}).eq('id',resaId);
+  showToast('Note sauvegardée','ok');
+  closeModal('modal-resa');
+  loadReservations();
+}
+
+// ═══════════════════════════════════════════
+// CLIENT ACTIONS
+// ═══════════════════════════════════════════
+async function openClientModal(clientId) {
+  const client = allClients.find(c=>c.id===clientId);
+  if(!client) return;
+
+  // Get reservation history
+  const clientResa = allResa.filter(r=>r.client_id===clientId)
+    .sort((a,b)=>b.date_rdv.localeCompare(a.date_rdv));
+
+  document.getElementById('modal-client-name').textContent = `${client.prenom} ${client.nom}`;
+  document.getElementById('modal-client-body').innerHTML = `
+    <div style="margin-bottom:1.5rem">
+      <div class="info-row"><span class="k">Prénom</span><span class="v">${client.prenom}</span></div>
+      <div class="info-row"><span class="k">Nom</span><span class="v">${client.nom}</span></div>
+      <div class="info-row"><span class="k">Téléphone</span><span class="v">${client.telephone||'—'}</span></div>
+      <div class="info-row"><span class="k">Courriel</span><span class="v">${client.email||'—'}</span></div>
+      <div class="info-row"><span class="k">Client depuis</span><span class="v">${client.created_at?.split('T')[0]||'—'}</span></div>
+      <div class="info-row"><span class="k">Statut</span><span class="v">${client.est_bloque?'<span class="status-badge status-annulé">Bloqué</span>':'<span class="status-badge status-confirmé">Actif</span>'}</span></div>
+    </div>
+
+    <div style="margin-bottom:1.5rem">
+      <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">Note interne sur le client</div>
+      <textarea id="client-note-input" rows="3" style="width:100%;background:var(--black);
+        border:1px solid var(--gold4);color:var(--white);padding:0.75rem;font-family:'Barlow',sans-serif;
+        font-size:0.9rem;outline:none;resize:vertical"
+        placeholder="Notes internes (visible staff uniquement)...">${client.note_client||''}</textarea>
+    </div>
+
+    <div>
+      <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">
+        Historique (${clientResa.length} RDV)
+      </div>
+      ${clientResa.length===0?'<p style="color:var(--dim2);font-size:0.85rem">Aucun historique</p>':
+        clientResa.slice(0,5).map(r=>`
+          <div style="border:1px solid var(--gold4);padding:0.6rem 0.9rem;margin-bottom:0.5rem;
+            display:flex;justify-content:space-between;font-size:0.82rem">
+            <span>${r.date_rdv} à ${r.heure_rdv?.substring(0,5)}</span>
+            <span style="color:var(--dim2)">${r.service}</span>
+            <span class="status-badge status-${r.statut}">${r.statut}</span>
+          </div>`).join('')}
+    </div>`;
+
+  document.getElementById('modal-client-footer').innerHTML = `
+    <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+      onclick="closeModal('modal-client')">Fermer</button>
+    <button class="btn-sm btn-gold-sm" onclick="saveClientNote('${clientId}')">Sauvegarder note</button>
+    ${client.est_bloque
+      ?`<button class="btn-sm btn-success" onclick="unblockClient('${clientId}');closeModal('modal-client')">Débloquer</button>`
+      :`<button class="btn-sm btn-danger" onclick="closeModal('modal-client');openBlockModal('${clientId}','${client.prenom} ${client.nom}')">Bloquer</button>`}
+  `;
+
+  document.getElementById('modal-client').classList.add('open');
+}
+
+async function saveClientNote(clientId) {
+  const note = document.getElementById('client-note-input').value.trim();
+  await sb.from('clients').update({note_client:note}).eq('id',clientId);
+  showToast('Note client sauvegardée','ok');
+  closeModal('modal-client');
+  loadClients();
+}
+
+function openBlockModal(clientId, name) {
+  document.getElementById('block-client-id').value = clientId;
+  document.getElementById('modal-block').querySelector('h3').innerHTML =
+    `⛔ Bloquer : ${name}`;
+  document.getElementById('block-reason').value='';
+  document.getElementById('modal-block').classList.add('open');
+}
+
+async function confirmBlock() {
+  const clientId = document.getElementById('block-client-id').value;
+  const reason = document.getElementById('block-reason').value.trim();
+  if(!reason){showToast('Veuillez entrer une raison','err');return;}
+  await sb.from('clients').update({est_bloque:true,raison_blocage:reason}).eq('id',clientId);
+  closeModal('modal-block');
+  showToast('Client bloqué','ok');
+  loadAll();
+}
+
+async function unblockClient(clientId) {
+  if(!confirm('Débloquer ce client ?')) return;
+  await sb.from('clients').update({est_bloque:false,raison_blocage:null}).eq('id',clientId);
+  showToast('Client débloqué','ok');
+  loadAll();
+}
+
+// ═══════════════════════════════════════════
+// WAITLIST
+// ═══════════════════════════════════════════
+async function removeWaitlist(id) {
+  if(!confirm('Retirer de la liste d\'attente ?')) return;
+  await sb.from('liste_attente').delete().eq('id',id);
+  showToast('Retiré de la liste d\'attente','ok');
+  loadWaitlist();
+}
+
+// ═══════════════════════════════════════════
+// UI UTILS
+// ═══════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// Close modal on background click
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
+});
+
+function showToast(msg, type='') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.className='toast',3000);
+}
+</script>
+</body>
+</html>

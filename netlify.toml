@@ -1,0 +1,17 @@
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[functions]
+  node_bundler = "esbuild"
+
+# Scheduled function: send 24h reminders every day at 10am UTC (6am EST)
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
+
+[context.production.environment]
+  NODE_VERSION = "18"
+
+# Cron: reminder runs daily at 10:00 UTC
+[functions."reminder-24h"]
+  schedule = "0 10 * * *"
