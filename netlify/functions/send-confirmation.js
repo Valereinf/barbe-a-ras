@@ -8,7 +8,7 @@ exports.handler = async (event) => {
   const data = JSON.parse(event.body);
   const { reservationId, prenom, nom, email, tel, barbier, service, prix, date, heure, note } = data;
 
-  // Generate cancellation  token (simple but unique)
+  // Generate cancellation token (simple but unique)
   const cancelToken = Buffer.from(`${reservationId}:${Date.now()}`).toString('base64url');
 
   // Save cancel token to Supabase
@@ -36,12 +36,13 @@ body{font-family:Arial,sans-serif;background:#f5f0e8;margin:0;padding:20px}
 .head p{color:#2a1f00;margin:5px 0 0;font-size:13px;letter-spacing:2px}
 .body{padding:35px}
 .body h2{color:#C9A84C;font-size:20px;letter-spacing:2px;margin-bottom:20px}
-.detail-box{border:1px solid rgba(201,168,76,0.3);padding:20px;margin:20px 0}
-.row{display:flex;justify-content:space-between;padding:8px 0;
-  border-bottom:1px solid rgba(201,168,76,0.1);font-size:14px}
-.row:last-child{border-bottom:none}
-.lbl{color:rgba(245,240,232,0.5)}
-.val{color:#f5f0e8;font-weight:600}
+.detail-box{border:1px solid rgba(201,168,76,0.3);padding:20px;margin:20px 0;width:100%}
+.detail-table{width:100%;border-collapse:collapse;font-size:14px}
+.detail-table tr{border-bottom:1px solid rgba(201,168,76,0.1)}
+.detail-table tr:last-child{border-bottom:none}
+.detail-table td{padding:8px 4px;vertical-align:top}
+.detail-table td.lbl{color:rgba(245,240,232,0.5);width:110px;white-space:nowrap}
+.detail-table td.val{color:#f5f0e8;font-weight:600;padding-left:16px}
 .policy{background:rgba(201,168,76,0.06);border-left:3px solid #C9A84C;
   padding:15px;margin:20px 0;font-size:13px;color:rgba(245,240,232,0.7);line-height:1.7}
 .policy h3{color:#C9A84C;font-size:13px;letter-spacing:2px;margin:0 0 10px;text-transform:uppercase}
@@ -69,13 +70,15 @@ body{font-family:Arial,sans-serif;background:#f5f0e8;margin:0;padding:20px}
     <p>Bonjour <strong>${prenom}</strong>, votre rendez-vous est bien enregistré.</p>
 
     <div class="detail-box">
-      <div class="row"><span class="lbl">Barbier·ère</span><span class="val">${barbier}</span></div>
-      <div class="row"><span class="lbl">Service</span><span class="val">${service}</span></div>
-      <div class="row"><span class="lbl">Date</span><span class="val">${date}</span></div>
-      <div class="row"><span class="lbl">Heure</span><span class="val">${heure}</span></div>
-      <div class="row"><span class="lbl">Prix</span><span class="val">${prix} + taxes</span></div>
-      ${note ? `<div class="row"><span class="lbl">Note</span><span class="val">${note}</span></div>` : ''}
-      <div class="row"><span class="lbl">Réf.</span><span class="val">#${reservationId.substring(0,8).toUpperCase()}</span></div>
+      <table class="detail-table">
+        <tr><td class="lbl">Barbier·ère</td><td class="val">${barbier}</td></tr>
+        <tr><td class="lbl">Service</td><td class="val">${service}</td></tr>
+        <tr><td class="lbl">Date</td><td class="val">${date}</td></tr>
+        <tr><td class="lbl">Heure</td><td class="val">${heure}</td></tr>
+        <tr><td class="lbl">Prix</td><td class="val">${prix} + taxes</td></tr>
+        ${note ? `<tr><td class="lbl">Note</td><td class="val">${note}</td></tr>` : ''}
+        <tr><td class="lbl">Réf.</td><td class="val">#${reservationId.substring(0,8).toUpperCase()}</td></tr>
+      </table>
     </div>
 
     <p style="font-size:13px;color:rgba(245,240,232,0.6)">
