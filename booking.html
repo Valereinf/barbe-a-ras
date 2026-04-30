@@ -631,8 +631,9 @@ async function submitBooking(){
   const note=document.getElementById('f-note').value.trim();
   const finalBarber=S.assignedBarber||S.barber;
   showOverlay('Vérification du compte...');
-  const telClean=tel.replace(/\D/g,'');
-  const {data:existingClient}=await sb.from('clients').select('id,est_bloque').eq('telephone',telClean).maybeSingle();
+  const telClean=tel.replace(/\D/g,'').slice(-10);
+  const {data:clientsFound}=await sb.from('clients').select('id,est_bloque').eq('telephone',telClean);
+  const existingClient = clientsFound && clientsFound.length > 0 ? clientsFound[0] : null;
   if(existingClient?.est_bloque){hideOverlay();document.getElementById('blocked-msg').style.display='block';document.getElementById('b4').disabled=true;return;}
   showOverlay('Enregistrement du rendez-vous...');
   let clientId=existingClient?.id;
