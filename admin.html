@@ -161,8 +161,8 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
 .cal-slot:hover{background:rgba(201,168,76,0.05)}
 .cal-slot.booked{background:rgba(201,168,76,0.08);cursor:default}
 .cal-slot.booked:hover{background:rgba(201,168,76,0.08)}
-.cal-slot.free{background:rgba(39,174,96,0.04)}
-.cal-slot.free:hover{background:rgba(39,174,96,0.1)}
+.cal-slot.free{background:rgba(39,174,96,0.04);cursor:pointer}
+.cal-slot.free:hover{background:rgba(39,174,96,0.15)}
 .cal-slot .slot-time{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;color:var(--dim2);min-width:50px}
 .cal-slot.booked .slot-time{color:var(--gold)}
 .cal-slot .slot-info{flex:1;margin:0 0.8rem;font-size:0.82rem}
@@ -240,6 +240,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
       <div class="nav-item" onclick="showTab('blocked')" id="nav-blocked">
         <span class="ico">⛔</span>Clients bloqués
       </div>
+      <div class="nav-item" onclick="showTab('horaires')" id="nav-horaires">
+        <span class="ico">🗓</span>Horaires
+      </div>
     </div>
 
     <!-- CONTENT -->
@@ -250,7 +253,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
         <div class="sec-head">
           <h2>Calendrier <span>du jour</span></h2>
           <div style="display:flex;gap:0.5rem;align-items:center">
+            <button class="btn-sm btn-info" onclick="calNavDay(-1)">‹ Jour précédent</button>
             <input type="date" id="cal-date-picker" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.4rem 0.7rem;font-family:'Barlow',sans-serif;font-size:0.85rem;outline:none;cursor:pointer" onchange="loadCalendrier(this.value)">
+            <button class="btn-sm btn-info" onclick="calNavDay(1)">Jour suivant ›</button>
             <button class="btn-sm btn-gold-sm" onclick="loadCalendrier()">↻ Aujourd'hui</button>
           </div>
         </div>
@@ -374,6 +379,190 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
         </table>
       </div>
 
+
+      <!-- HORAIRES / INDISPONIBILITÉS -->
+      <div class="tab" id="tab-horaires">
+        <div class="sec-head">
+          <h2>Gestion des <span>horaires</span></h2>
+          <button class="btn-sm btn-gold-sm" onclick="openIndiModal()">+ Ajouter une indisponibilité</button>
+        </div>
+        <div style="margin-bottom:1rem;font-size:0.82rem;color:var(--dim2)">
+          Gérez les congés et indisponibilités des barbiers. Les créneaux bloqués afficheront "Non disponible" sur le site de réservation.
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Barbier</th><th>Date début</th><th>Date fin</th><th>Raison</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="indi-tbody"><tr><td colspan="5" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL: MODIFIER RDV -->
+<div class="modal-bg" id="modal-edit-resa">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>✏️ Modifier le rendez-vous</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-resa')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-resa-id">
+      <div class="field">
+        <label>Barbier·ère</label>
+        <select id="edit-resa-barbier">
+          <option value="Barbara Sandra">Barbara Sandra</option>
+          <option value="Michael">Michael</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Service</label>
+        <select id="edit-resa-service">
+          <option>Coupe de cheveux adulte</option>
+          <option>Coupe enfant (0-15 ans)</option>
+          <option>Cheveux + barbe à la lame serviette chaude</option>
+          <option>Coupe de cheveux long à court</option>
+          <option>Coupe + barbe au clipper</option>
+          <option>Coupe + shampoing</option>
+          <option>Barbe à la lame + serviettes chaudes</option>
+          <option>Cheveux + barbe lame + shampoing</option>
+          <option>Coupe adulte hors heures</option>
+          <option>Coupe + barbe lame hors heures</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Prix</label>
+        <input type="text" id="edit-resa-prix" placeholder="29.50$">
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="edit-resa-date">
+      </div>
+      <div class="field">
+        <label>Heure</label>
+        <select id="edit-resa-heure">
+          <option>08:00</option><option>08:30</option>
+          <option>09:00</option><option>09:30</option>
+          <option>10:00</option><option>10:30</option>
+          <option>11:00</option><option>11:30</option>
+          <option>13:00</option><option>13:30</option>
+          <option>14:00</option><option>14:30</option>
+          <option>15:00</option><option>15:30</option>
+          <option>16:00</option><option>16:30</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+        onclick="closeModal('modal-edit-resa')">Annuler</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveResaEdit()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MODIFIER CLIENT -->
+<div class="modal-bg" id="modal-edit-client">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>✏️ Modifier la fiche client</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-client')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-client-id">
+      <div class="field"><label>Prénom</label><input type="text" id="edit-client-prenom"></div>
+      <div class="field"><label>Nom</label><input type="text" id="edit-client-nom"></div>
+      <div class="field"><label>Téléphone</label><input type="tel" id="edit-client-tel"></div>
+      <div class="field"><label>Courriel</label><input type="email" id="edit-client-email"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+        onclick="closeModal('modal-edit-client')">Annuler</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveClientEdit()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: INDISPONIBILITÉ -->
+<div class="modal-bg" id="modal-indi">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="indi-modal-title">+ Ajouter une indisponibilité</h3>
+      <button class="modal-close" onclick="closeModal('modal-indi')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="indi-id">
+      <div class="field">
+        <label>Barbier·ère</label>
+        <select id="indi-barbier">
+          <option value="Barbara Sandra">Barbara Sandra</option>
+          <option value="Michael">Michael</option>
+          <option value="Tous">Tous les deux (salon fermé)</option>
+        </select>
+      </div>
+      <div class="field"><label>Date début</label><input type="date" id="indi-debut"></div>
+      <div class="field"><label>Date fin</label><input type="date" id="indi-fin"></div>
+      <div class="field">
+        <label>Raison <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label>
+        <input type="text" id="indi-raison" placeholder="Ex: Vacances, Maladie, Formation...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+        onclick="closeModal('modal-indi')">Annuler</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveIndi()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOUVEAU RDV PAR TÉLÉPHONE -->
+<div class="modal-bg" id="modal-new-resa">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>📞 Nouveau RDV par téléphone</h3>
+      <button class="modal-close" onclick="closeModal('modal-new-resa')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(201,168,76,0.06);border-left:3px solid var(--gold);padding:0.8rem;margin-bottom:1.2rem;font-size:0.85rem;color:var(--dim)">
+        <strong style="color:var(--gold)" id="new-resa-slot-label"></strong>
+      </div>
+      <input type="hidden" id="new-resa-date">
+      <input type="hidden" id="new-resa-time">
+      <input type="hidden" id="new-resa-barbier">
+      <div class="field">
+        <label>Téléphone client * <span style="font-size:0.65rem;color:var(--dim2)">(cherche client existant)</span></label>
+        <div style="display:flex;gap:0.5rem">
+          <input type="tel" id="new-resa-tel" placeholder="514-555-0000" style="flex:1">
+          <button class="btn-sm btn-info" onclick="searchClientByTel()">Chercher</button>
+        </div>
+        <div id="client-found-msg" style="margin-top:0.4rem;font-size:0.8rem;color:var(--green);display:none"></div>
+      </div>
+      <div class="field"><label>Prénom *</label><input type="text" id="new-resa-prenom" placeholder="Jean"></div>
+      <div class="field"><label>Nom *</label><input type="text" id="new-resa-nom" placeholder="Tremblay"></div>
+      <div class="field"><label>Courriel <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label><input type="email" id="new-resa-email" placeholder="jean@exemple.com"></div>
+      <div class="field">
+        <label>Service *</label>
+        <select id="new-resa-service" onchange="updatePrix()">
+          <option value="Coupe de cheveux adulte" data-prix="29.50">Coupe de cheveux adulte — 29.50$</option>
+          <option value="Coupe enfant (0-15 ans)" data-prix="27.00">Coupe enfant (0-15 ans) — 27.00$</option>
+          <option value="Cheveux + barbe à la lame serviette chaude" data-prix="56.00">Cheveux + barbe à la lame — 56.00$</option>
+          <option value="Coupe de cheveux long à court" data-prix="47.00">Coupe long à court — 47.00$</option>
+          <option value="Coupe + barbe au clipper" data-prix="47.00">Coupe + barbe au clipper — 47.00$</option>
+          <option value="Coupe + shampoing" data-prix="31.50">Coupe + shampoing — 31.50$</option>
+          <option value="Barbe à la lame + serviettes chaudes" data-prix="29.50">Barbe à la lame — 29.50$</option>
+          <option value="Cheveux + barbe lame + shampoing" data-prix="59.00">Cheveux + barbe lame + shampoing — 59.00$</option>
+          <option value="Coupe adulte hors heures" data-prix="55.00">Coupe adulte hors heures — 55.00$</option>
+          <option value="Coupe + barbe lame hors heures" data-prix="105.00">Coupe + barbe lame hors heures — 105.00$</option>
+        </select>
+      </div>
+      <div class="field"><label>Note <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label><input type="text" id="new-resa-note" placeholder="Instructions spéciales..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+        onclick="closeModal('modal-new-resa')">Annuler</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveNewResa()">✅ Confirmer le RDV</button>
     </div>
   </div>
 </div>
@@ -710,6 +899,7 @@ async function openResaModal(id) {
   document.getElementById('modal-resa-footer').innerHTML = `
     <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
       onclick="closeModal('modal-resa')">Fermer</button>
+    <button class="btn-sm btn-info" onclick="openEditResaModal('${id}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
   `;
@@ -772,6 +962,7 @@ async function openClientModal(clientId) {
   document.getElementById('modal-client-footer').innerHTML = `
     <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
       onclick="closeModal('modal-client')">Fermer</button>
+    <button class="btn-sm btn-info" onclick="openEditClientModal('${clientId}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveClientNote('${clientId}')">Sauvegarder note</button>
     ${client.est_bloque
       ?`<button class="btn-sm btn-success" onclick="unblockClient('${clientId}');closeModal('modal-client')">Débloquer</button>`
@@ -833,6 +1024,7 @@ function showTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='calendrier') loadCalendrier();
+  if(name==='horaires') loadIndisponibilites();
 }
 
 // ═══════════════════════════════════════════
@@ -851,15 +1043,14 @@ async function loadCalendrier(dateStr) {
   const dow = dt.getDay();
   const label = document.getElementById('cal-date-label');
 
-  // Check if open day
   const isOpen = dow >= 2 && dow <= 6;
   const isSat = dow === 6;
   const dateFormatted = dt.toLocaleDateString('fr-CA', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   label.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
 
   if(!isOpen) {
-    document.getElementById('cal-barbara').innerHTML = '<div class="empty" style="padding:2rem">Salon fermé ce jour</div>';
-    document.getElementById('cal-michael').innerHTML = '<div class="empty" style="padding:2rem">Salon fermé ce jour</div>';
+    document.getElementById('cal-barbara').innerHTML = '<div class="empty" style="padding:2rem">🔒 Salon fermé ce jour</div>';
+    document.getElementById('cal-michael').innerHTML = '<div class="empty" style="padding:2rem">🔒 Salon fermé ce jour</div>';
     document.getElementById('cal-barbara-count').textContent = '';
     document.getElementById('cal-michael-count').textContent = '';
     return;
@@ -869,22 +1060,21 @@ async function loadCalendrier(dateStr) {
     ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']
     : ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
 
-  // Fetch reservations for both
-  const [rB, rM] = await Promise.all([
-    sb.from('reservations')
-      .select('heure_rdv,service,clients(prenom,nom)')
-      .eq('date_rdv', dateStr)
-      .eq('barbier', 'Barbara Sandra')
-      .eq('statut', 'confirmé'),
-    sb.from('reservations')
-      .select('heure_rdv,service,clients(prenom,nom)')
-      .eq('date_rdv', dateStr)
-      .eq('barbier', 'Michael')
-      .eq('statut', 'confirmé')
+  const [rB, rM, indiResp] = await Promise.all([
+    sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
+      .eq('date_rdv', dateStr).eq('barbier', 'Barbara Sandra').eq('statut', 'confirmé'),
+    sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
+      .eq('date_rdv', dateStr).eq('barbier', 'Michael').eq('statut', 'confirmé'),
+    sb.from('indisponibilites').select('*')
+      .lte('date_debut', dateStr).gte('date_fin', dateStr)
   ]);
 
   const resaBarbara = rB.data || [];
   const resaMichael = rM.data || [];
+  const indis = indiResp.data || [];
+
+  const barbaraBlocked = indis.some(i=>i.barbier==='Barbara Sandra'||i.barbier==='Tous');
+  const michaelBlocked = indis.some(i=>i.barbier==='Michael'||i.barbier==='Tous');
 
   const bookedB = {};
   resaBarbara.forEach(r => { bookedB[r.heure_rdv.substring(0,5)] = r; });
@@ -893,17 +1083,24 @@ async function loadCalendrier(dateStr) {
 
   const freeB = allSlots.filter(t => !bookedB[t]).length;
   const freeM = allSlots.filter(t => !bookedM[t]).length;
-  document.getElementById('cal-barbara-count').textContent = `${resaBarbara.length} RDV · ${freeB} libres`;
-  document.getElementById('cal-michael-count').textContent = `${resaMichael.length} RDV · ${freeM} libres`;
+  document.getElementById('cal-barbara-count').textContent = barbaraBlocked ? '🔴 Indisponible' : `${resaBarbara.length} RDV · ${freeB} libres`;
+  document.getElementById('cal-michael-count').textContent = michaelBlocked ? '🔴 Indisponible' : `${resaMichael.length} RDV · ${freeM} libres`;
 
-  function renderCol(el, booked) {
-    if(allSlots.length === 0) { el.innerHTML = '<div class="empty" style="padding:2rem">Fermé</div>'; return; }
+  function renderCol(el, booked, barbier, isBlocked) {
+    if(isBlocked) {
+      const indi = indis.find(i=>i.barbier===barbier||i.barbier==='Tous');
+      el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--red)">
+        🔴 <strong>Indisponible</strong><br>
+        <span style="font-size:0.78rem;color:var(--dim2);margin-top:0.3rem;display:block">${indi?.raison||'Congé'}</span>
+      </div>`;
+      return;
+    }
     el.innerHTML = allSlots.map(t => {
       const r = booked[t];
       if(r) {
         const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
-        const svc = r.service ? r.service.substring(0,30)+(r.service.length>30?'…':'') : '—';
-        return `<div class="cal-slot booked" onclick="openResaByTime('${dateStr}','${t}')">
+        const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
+        return `<div class="cal-slot booked" onclick="openResaById('${r.id}')">
           <span class="slot-time">${t}</span>
           <div class="slot-info">
             <div class="slot-name">${nom}</div>
@@ -912,30 +1109,254 @@ async function loadCalendrier(dateStr) {
           <span class="slot-badge">RDV</span>
         </div>`;
       } else {
-        return `<div class="cal-slot free">
+        return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${barbier}')">
           <span class="slot-time">${t}</span>
-          <div class="slot-info"><div class="slot-svc" style="color:var(--green)">Disponible</div></div>
-          <span class="slot-badge">Libre</span>
+          <div class="slot-info"><div class="slot-svc" style="color:var(--green)">Disponible — cliquer pour RDV</div></div>
+          <span class="slot-badge">+</span>
         </div>`;
       }
     }).join('');
   }
 
-  renderCol(document.getElementById('cal-barbara'), bookedB);
-  renderCol(document.getElementById('cal-michael'), bookedM);
+  renderCol(document.getElementById('cal-barbara'), bookedB, 'Barbara Sandra', barbaraBlocked);
+  renderCol(document.getElementById('cal-michael'), bookedM, 'Michael', michaelBlocked);
+}
+
+function calNavDay(delta) {
+  const picker = document.getElementById('cal-date-picker');
+  const current = picker.value || new Date().toISOString().split('T')[0];
+  const dt = new Date(current + 'T12:00:00');
+  dt.setDate(dt.getDate() + delta);
+  loadCalendrier(dt.toISOString().split('T')[0]);
+}
+
+async function openResaById(id) {
+  if(!allResa.find(r=>r.id===id)) await loadReservations();
+  openResaModal(id);
 }
 
 async function openResaByTime(dateStr, heure) {
   const {data} = await sb.from('reservations')
-    .select('id')
-    .eq('date_rdv', dateStr)
-    .eq('heure_rdv', heure+':00')
-    .eq('statut', 'confirmé')
-    .single();
+    .select('id').eq('date_rdv', dateStr)
+    .eq('heure_rdv', heure+':00').eq('statut', 'confirmé').single();
   if(data) openResaModal(data.id);
 }
 
-function closeModal(id) {
+// ═══════════════════════════════════════════
+// MODIFIER RDV (Admin)
+// ═══════════════════════════════════════════
+function openEditResaModal(id) {
+  const resa = allResa.find(r=>r.id===id);
+  if(!resa) return;
+  document.getElementById('edit-resa-id').value = id;
+  document.getElementById('edit-resa-barbier').value = resa.barbier||'Barbara Sandra';
+  document.getElementById('edit-resa-service').value = resa.service||'Coupe de cheveux adulte';
+  document.getElementById('edit-resa-prix').value = resa.prix||'';
+  document.getElementById('edit-resa-date').value = resa.date_rdv||'';
+  const heure = resa.heure_rdv?.substring(0,5)||'09:00';
+  document.getElementById('edit-resa-heure').value = heure;
+  closeModal('modal-resa');
+  document.getElementById('modal-edit-resa').classList.add('open');
+}
+
+async function saveResaEdit() {
+  const id = document.getElementById('edit-resa-id').value;
+  const barbier = document.getElementById('edit-resa-barbier').value;
+  const service = document.getElementById('edit-resa-service').value;
+  const prix = document.getElementById('edit-resa-prix').value;
+  const date = document.getElementById('edit-resa-date').value;
+  const heure = document.getElementById('edit-resa-heure').value;
+  if(!date||!heure){showToast('Date et heure requises','err');return;}
+  await sb.from('reservations').update({
+    barbier, service, prix, date_rdv:date, heure_rdv:heure+':00', rappel_envoye:false
+  }).eq('id',id);
+  showToast('Rendez-vous modifié ✅','ok');
+  closeModal('modal-edit-resa');
+  loadAll();
+}
+
+// ═══════════════════════════════════════════
+// MODIFIER CLIENT (Admin)
+// ═══════════════════════════════════════════
+function openEditClientModal(clientId) {
+  const client = allClients.find(c=>c.id===clientId);
+  if(!client) return;
+  document.getElementById('edit-client-id').value = clientId;
+  document.getElementById('edit-client-prenom').value = client.prenom||'';
+  document.getElementById('edit-client-nom').value = client.nom||'';
+  document.getElementById('edit-client-tel').value = client.telephone||'';
+  document.getElementById('edit-client-email').value = client.email||'';
+  closeModal('modal-client');
+  document.getElementById('modal-edit-client').classList.add('open');
+}
+
+async function saveClientEdit() {
+  const id = document.getElementById('edit-client-id').value;
+  const prenom = document.getElementById('edit-client-prenom').value.trim();
+  const nom = document.getElementById('edit-client-nom').value.trim();
+  const tel = document.getElementById('edit-client-tel').value.trim();
+  const email = document.getElementById('edit-client-email').value.trim();
+  if(!prenom||!nom){showToast('Prénom et nom requis','err');return;}
+  await sb.from('clients').update({
+    prenom, nom, telephone:tel.replace(/\D/g,''), email:email||null
+  }).eq('id',id);
+  showToast('Fiche client modifiée ✅','ok');
+  closeModal('modal-edit-client');
+  loadAll();
+}
+
+// ═══════════════════════════════════════════
+// INDISPONIBILITÉS
+// ═══════════════════════════════════════════
+async function loadIndisponibilites() {
+  const {data} = await sb.from('indisponibilites').select('*').order('date_debut',{ascending:true});
+  const tbody = document.getElementById('indi-tbody');
+  if(!data||data.length===0){
+    tbody.innerHTML='<tr><td colspan="5" class="empty">Aucune indisponibilité enregistrée</td></tr>';return;
+  }
+  tbody.innerHTML = data.map(d=>`
+    <tr>
+      <td><strong style="color:${d.barbier==='Michael'?'var(--blue)':'var(--gold)'}">${d.barbier}</strong></td>
+      <td>${d.date_debut}</td>
+      <td>${d.date_fin}</td>
+      <td style="color:var(--dim2);font-size:0.82rem">${d.raison||'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-info" style="margin-right:4px" onclick="openEditIndiModal('${d.id}','${d.barbier}','${d.date_debut}','${d.date_fin}','${d.raison||''}')">✏️ Modifier</button>
+        <button class="btn-sm btn-danger" onclick="deleteIndi('${d.id}')">Supprimer</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openIndiModal() {
+  document.getElementById('indi-id').value = '';
+  document.getElementById('indi-modal-title').textContent = '+ Ajouter une indisponibilité';
+  document.getElementById('indi-barbier').value = 'Barbara Sandra';
+  document.getElementById('indi-debut').value = '';
+  document.getElementById('indi-fin').value = '';
+  document.getElementById('indi-raison').value = '';
+  document.getElementById('modal-indi').classList.add('open');
+}
+
+function openEditIndiModal(id, barbier, debut, fin, raison) {
+  document.getElementById('indi-id').value = id;
+  document.getElementById('indi-modal-title').textContent = '✏️ Modifier l\'indisponibilité';
+  document.getElementById('indi-barbier').value = barbier;
+  document.getElementById('indi-debut').value = debut;
+  document.getElementById('indi-fin').value = fin;
+  document.getElementById('indi-raison').value = raison;
+  document.getElementById('modal-indi').classList.add('open');
+}
+
+async function saveIndi() {
+  const id = document.getElementById('indi-id').value;
+  const barbier = document.getElementById('indi-barbier').value;
+  const debut = document.getElementById('indi-debut').value;
+  const fin = document.getElementById('indi-fin').value;
+  const raison = document.getElementById('indi-raison').value.trim();
+  if(!debut||!fin){showToast('Dates requises','err');return;}
+  if(fin < debut){showToast('La date de fin doit être après la date de début','err');return;}
+  if(id) {
+    await sb.from('indisponibilites').update({barbier,date_debut:debut,date_fin:fin,raison:raison||null}).eq('id',id);
+  } else {
+    await sb.from('indisponibilites').insert({barbier,date_debut:debut,date_fin:fin,raison:raison||null});
+  }
+  showToast('Indisponibilité sauvegardée ✅','ok');
+  closeModal('modal-indi');
+  loadIndisponibilites();
+}
+
+async function deleteIndi(id) {
+  if(!confirm('Supprimer cette indisponibilité ?')) return;
+  await sb.from('indisponibilites').delete().eq('id',id);
+  showToast('Indisponibilité supprimée','ok');
+  loadIndisponibilites();
+}
+
+// ═══════════════════════════════════════════
+// NOUVEAU RDV PAR TÉLÉPHONE (depuis calendrier)
+// ═══════════════════════════════════════════
+let newResaClientId = null;
+
+function openNewResaModal(dateStr, time, barbier) {
+  newResaClientId = null;
+  document.getElementById('new-resa-date').value = dateStr;
+  document.getElementById('new-resa-time').value = time;
+  document.getElementById('new-resa-barbier').value = barbier;
+  const dt = new Date(dateStr+'T12:00:00');
+  const dateFormatted = dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('new-resa-slot-label').textContent = `📅 ${dateFormatted} à ${time} — ${barbier}`;
+  document.getElementById('new-resa-tel').value='';
+  document.getElementById('new-resa-prenom').value='';
+  document.getElementById('new-resa-nom').value='';
+  document.getElementById('new-resa-email').value='';
+  document.getElementById('new-resa-note').value='';
+  document.getElementById('client-found-msg').style.display='none';
+  document.getElementById('modal-new-resa').classList.add('open');
+}
+
+async function searchClientByTel() {
+  const tel = document.getElementById('new-resa-tel').value.replace(/\D/g,'').slice(-10);
+  if(!tel){showToast('Entrez un numéro de téléphone','err');return;}
+  const {data} = await sb.from('clients').select('*').eq('telephone',tel);
+  const msg = document.getElementById('client-found-msg');
+  if(data && data.length > 0) {
+    const c = data[0];
+    newResaClientId = c.id;
+    document.getElementById('new-resa-prenom').value = c.prenom;
+    document.getElementById('new-resa-nom').value = c.nom;
+    document.getElementById('new-resa-email').value = c.email||'';
+    msg.textContent = `✅ Client trouvé : ${c.prenom} ${c.nom}`;
+    msg.style.color = 'var(--green)';
+    msg.style.display = 'block';
+  } else {
+    newResaClientId = null;
+    msg.textContent = 'Nouveau client — remplissez les informations';
+    msg.style.color = 'var(--dim2)';
+    msg.style.display = 'block';
+  }
+}
+
+function updatePrix() {
+  // prix auto-calculated — no display needed
+}
+
+async function saveNewResa() {
+  const date = document.getElementById('new-resa-date').value;
+  const time = document.getElementById('new-resa-time').value;
+  const barbier = document.getElementById('new-resa-barbier').value;
+  const prenom = document.getElementById('new-resa-prenom').value.trim();
+  const nom = document.getElementById('new-resa-nom').value.trim();
+  const tel = document.getElementById('new-resa-tel').value.replace(/\D/g,'').slice(-10);
+  const email = document.getElementById('new-resa-email').value.trim();
+  const serviceEl = document.getElementById('new-resa-service');
+  const service = serviceEl.value;
+  const prix = serviceEl.options[serviceEl.selectedIndex].dataset.prix + '$';
+  const note = document.getElementById('new-resa-note').value.trim();
+
+  if(!prenom||!nom||!tel){showToast('Prénom, nom et téléphone requis','err');return;}
+
+  let clientId = newResaClientId;
+  if(!clientId) {
+    const {data:nc} = await sb.from('clients')
+      .insert({prenom,nom,telephone:tel,email:email||null})
+      .select('id').single();
+    clientId = nc?.id;
+  }
+  if(!clientId){showToast('Erreur création client','err');return;}
+
+  await sb.from('reservations').insert({
+    client_id:clientId, barbier, service, prix,
+    date_rdv:date, heure_rdv:time+':00',
+    statut:'confirmé', note_client:note
+  });
+
+  showToast('RDV créé avec succès ✅','ok');
+  closeModal('modal-new-resa');
+  loadAll();
+  loadCalendrier(date);
+}
+
+
   document.getElementById(id).classList.remove('open');
 }
 
