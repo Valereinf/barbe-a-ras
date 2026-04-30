@@ -357,12 +357,15 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
           <h2>Liste d'<span>attente</span></h2>
           <button class="btn-sm btn-gold-sm" onclick="loadWaitlist()">↻ Actualiser</button>
         </div>
+        <div style="margin-bottom:1rem;font-size:0.82rem;color:var(--dim2)">
+          Les clients en attente sont notifiés automatiquement quand un créneau se libère. Barbara peut aussi notifier manuellement.
+        </div>
         <table class="data-table">
           <thead><tr>
-            <th>Client</th><th>Service</th><th>Date souhaitée</th>
+            <th>#</th><th>Client</th><th>Service</th><th>Date souhaitée</th>
             <th>Barbier</th><th>Statut</th><th>Actions</th>
           </tr></thead>
-          <tbody id="waitlist-tbody"><tr><td colspan="6" class="empty">Chargement...</td></tr></tbody>
+          <tbody id="waitlist-tbody"><tr><td colspan="7" class="empty">Chargement...</td></tr></tbody>
         </table>
       </div>
 
@@ -563,6 +566,68 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
       <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
         onclick="closeModal('modal-new-resa')">Annuler</button>
       <button class="btn-sm btn-gold-sm" onclick="saveNewResa()">✅ Confirmer le RDV</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MODIFIER LISTE D'ATTENTE -->
+<div class="modal-bg" id="modal-edit-waitlist">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>✏️ Modifier l'entrée — liste d'attente</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-waitlist')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-wl-id">
+      <div id="edit-wl-client-info" style="background:rgba(201,168,76,0.06);border-left:3px solid var(--gold);padding:0.8rem;margin-bottom:1.2rem;font-size:0.85rem;color:var(--dim)"></div>
+      <div class="field">
+        <label>Service souhaité</label>
+        <select id="edit-wl-service">
+          <option>Coupe de cheveux adulte</option>
+          <option>Coupe enfant (0-15 ans)</option>
+          <option>Cheveux + barbe à la lame serviette chaude</option>
+          <option>Coupe de cheveux long à court</option>
+          <option>Coupe + barbe au clipper</option>
+          <option>Coupe + shampoing</option>
+          <option>Barbe à la lame + serviettes chaudes</option>
+          <option>Cheveux + barbe lame + shampoing</option>
+          <option>Coupe adulte hors heures</option>
+          <option>Coupe + barbe lame hors heures</option>
+          <option>Non précisé</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Barbier souhaité</label>
+        <select id="edit-wl-barbier">
+          <option value="Sans préférence">Sans préférence</option>
+          <option value="Barbara Sandra">Barbara Sandra</option>
+          <option value="Michael">Michael</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Date souhaitée</label>
+        <input type="date" id="edit-wl-date">
+      </div>
+      <div class="field">
+        <label>Statut</label>
+        <select id="edit-wl-statut">
+          <option value="en_attente">En attente</option>
+          <option value="notifié">Notifié</option>
+          <option value="confirmé">Confirmé</option>
+          <option value="retiré">Retiré</option>
+        </select>
+      </div>
+      <div style="margin-top:1.2rem;padding:1rem;background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.2)">
+        <div style="font-size:0.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:0.6rem">📣 Notifier ce client</div>
+        <p style="font-size:0.82rem;color:var(--dim2);margin-bottom:0.8rem">Envoie un SMS/courriel au client pour l'informer qu'une place est disponible.</p>
+        <button class="btn-sm btn-info" onclick="notifyWaitlistClient()">📱 Envoyer notification maintenant</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
+        onclick="closeModal('modal-edit-waitlist')">Annuler</button>
+      <button class="btn-sm btn-danger" onclick="removeWaitlistFromModal()">🗑 Retirer</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveWaitlistEdit()">💾 Sauvegarder</button>
     </div>
   </div>
 </div>
@@ -805,16 +870,24 @@ function renderBlocked(data) {
 
 function renderWaitlist(data) {
   const tbody = document.getElementById('waitlist-tbody');
-  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" class="empty">Liste d\'attente vide</td></tr>';return;}
-  tbody.innerHTML = data.map(w=>`
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="7" class="empty">Liste d\'attente vide</td></tr>';return;}
+  tbody.innerHTML = data.map((w,i)=>`
     <tr>
-      <td><strong>${w.clients?.prenom||''} ${w.clients?.nom||''}</strong>
-        <div style="font-size:0.75rem;color:var(--dim2)">${w.clients?.email||''}</div></td>
+      <td style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold)">${i+1}</td>
+      <td>
+        <strong>${w.clients?.prenom||''} ${w.clients?.nom||''}</strong>
+        <div style="font-size:0.75rem;color:var(--dim2)">${w.clients?.telephone||''}</div>
+        <div style="font-size:0.75rem;color:var(--dim2)">${w.clients?.email||''}</div>
+      </td>
       <td style="font-size:0.82rem">${w.service||'—'}</td>
       <td>${w.date_souhaitee||'—'}</td>
       <td>${w.barbier||'—'}</td>
       <td><span class="status-badge status-${w.statut}">${w.statut}</span></td>
-      <td><button class="btn-sm btn-danger" onclick="removeWaitlist('${w.id}')">Retirer</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-info" style="margin-right:4px" onclick="openEditWaitlistModal('${w.id}')">✏️ Modifier</button>
+        <button class="btn-sm btn-success" style="margin-right:4px" onclick="quickNotifyWaitlist('${w.id}')">📱 Notifier</button>
+        <button class="btn-sm btn-danger" onclick="removeWaitlist('${w.id}')">Retirer</button>
+      </td>
     </tr>`).join('');
 }
 
@@ -1006,14 +1079,94 @@ async function unblockClient(clientId) {
 }
 
 // ═══════════════════════════════════════════
-// WAITLIST
+// WAITLIST — MODIFIER & NOTIFIER
 // ═══════════════════════════════════════════
+function openEditWaitlistModal(id) {
+  const w = allWaitlist.find(x=>x.id===id);
+  if(!w) return;
+  document.getElementById('edit-wl-id').value = id;
+  document.getElementById('edit-wl-client-info').innerHTML =
+    `<strong style="color:var(--gold)">${w.clients?.prenom||''} ${w.clients?.nom||''}</strong> · 
+     📞 ${w.clients?.telephone||'—'} · 
+     ✉️ ${w.clients?.email||'Pas de courriel'}`;
+  document.getElementById('edit-wl-service').value = w.service||'Non précisé';
+  document.getElementById('edit-wl-barbier').value = w.barbier||'Sans préférence';
+  document.getElementById('edit-wl-date').value = w.date_souhaitee||'';
+  document.getElementById('edit-wl-statut').value = w.statut||'en_attente';
+  document.getElementById('modal-edit-waitlist').classList.add('open');
+}
+
+async function saveWaitlistEdit() {
+  const id = document.getElementById('edit-wl-id').value;
+  const service = document.getElementById('edit-wl-service').value;
+  const barbier = document.getElementById('edit-wl-barbier').value;
+  const date = document.getElementById('edit-wl-date').value;
+  const statut = document.getElementById('edit-wl-statut').value;
+  await sb.from('liste_attente').update({
+    service, barbier, date_souhaitee:date||null, statut
+  }).eq('id',id);
+  showToast('Liste d\'attente mise à jour ✅','ok');
+  closeModal('modal-edit-waitlist');
+  loadWaitlist();
+}
+
+async function removeWaitlistFromModal() {
+  const id = document.getElementById('edit-wl-id').value;
+  if(!confirm('Retirer ce client de la liste d\'attente ?')) return;
+  await sb.from('liste_attente').delete().eq('id',id);
+  showToast('Client retiré de la liste','ok');
+  closeModal('modal-edit-waitlist');
+  loadWaitlist();
+}
+
+async function notifyWaitlistClient() {
+  const id = document.getElementById('edit-wl-id').value;
+  await doNotifyWaitlist(id);
+}
+
+async function quickNotifyWaitlist(id) {
+  if(!confirm('Envoyer une notification à ce client ?')) return;
+  await doNotifyWaitlist(id);
+}
+
+async function doNotifyWaitlist(id) {
+  const w = allWaitlist.find(x=>x.id===id);
+  if(!w) return;
+  const client = w.clients;
+  const tel = client?.telephone;
+  const email = client?.email;
+  const prenom = client?.prenom;
+  const dateStr = w.date_souhaitee || 'prochainement';
+
+  let sent = false;
+
+  // SMS via Twilio
+  if(tel) {
+    try {
+      await fetch('/.netlify/functions/notify-waitlist', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({tel, email, prenom, date: dateStr, service: w.service})
+      });
+      sent = true;
+    } catch(e) {}
+  }
+
+  // Update status to notifié
+  await sb.from('liste_attente').update({statut:'notifié'}).eq('id',id);
+  showToast(`Notification envoyée à ${prenom} ✅`,'ok');
+  closeModal('modal-edit-waitlist');
+  loadWaitlist();
+}
+
 async function removeWaitlist(id) {
   if(!confirm('Retirer de la liste d\'attente ?')) return;
   await sb.from('liste_attente').delete().eq('id',id);
   showToast('Retiré de la liste d\'attente','ok');
   loadWaitlist();
 }
+
+
 
 // ═══════════════════════════════════════════
 // UI UTILS
