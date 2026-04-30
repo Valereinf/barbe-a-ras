@@ -22,8 +22,9 @@ exports.handler = async (event) => {
     body: JSON.stringify({ cancel_token: cancelToken })
   });
 
-  const siteUrl = process.env.URL || 'https://jocular-squirrel-d29f32.netlify.app';
-  const cancelUrl = `${siteUrl}/cancel.html?token=${cancelToken}&id=${reservationId}`;
+  const siteUrl = 'https://barbe-a-ras.ca';
+  const cancelUrl = `${siteUrl}/cancel?token=${cancelToken}&id=${reservationId}`;
+  const modifyUrl = `${siteUrl}/modify?token=${cancelToken}&id=${reservationId}`;
 
   const html = `
 <!DOCTYPE html>
@@ -110,11 +111,43 @@ body{font-family:Arial,sans-serif;background:#f5f0e8;margin:0;padding:20px}
     </div>
   </div>
   <div class="footer">
-    © 2022–2025 Barbe-À-Ras · 749 Rue d'Alma, Local 101, Chicoutimi, QC<br>
+    © 2023–2025 Barbe-À-Ras · 749 Rue d'Alma, Local 101, Chicoutimi, QC<br>
     Cet email a été envoyé suite à votre réservation en ligne.
   </div>
 </div>
 </body></html>`;
+
+  // Send SMS via Twilio
+  const TWILIO_SID = process.env.TWILIO_SID;
+  const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
+  const TWILIO_PHONE = process.env.TWILIO_PHONE;
+
+  if (tel && TWILIO_SID && TWILIO_TOKEN) {
+    try {
+      const telClean = tel.replace(/\D/g,'');
+      const smsBody = `Bonjour ${prenom}! ✅ RDV confirmé chez Barbe-À-Ras le ${date} à ${heure} avec ${barbier}. Modifier: ${modifyUrl} Annuler: ${cancelUrl}`;
+      await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            From: TWILIO_PHONE.replace(/\s/g,''),
+            To: '+1' + telClean.slice(-10),
+            Body: smsBody
+          }).toString()
+        }
+      );
+    } catch(e) { /* SMS error non-blocking */ }
+  }
+
+  // Send email via Resend (only if email provided)
+  if (!email) {
+    return { statusCode: 200, body: JSON.stringify({ ok: true, smsOnly: true }) };
+  }
 
   // Send via Resend
   const resp = await fetch('https://api.resend.com/emails', {
