@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modifier mon rendez-vous — Barbe-À-Ras</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#C9A84C;--gold2:#E8C96B;--gold4:rgba(201,168,76,0.35);--black:#080808;--charcoal:#131313;--white:#F5F0E8;--dim:rgba(245,240,232,0.65);--dim2:rgba(245,240,232,0.35);--red:#e74c3c;--green:#27ae60}
+body{font-family:'Barlow',sans-serif;background:var(--black);color:var(--white);min-height:100vh;display:flex;flex-direction:column}
+nav{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;background:rgba(8,8,8,0.97);border-bottom:1px solid var(--gold4)}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px;color:var(--gold);text-decoration:none}
+.nav-tel{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold);text-decoration:none}
+.page{flex:1;padding:2rem 1.5rem;max-width:600px;margin:0 auto;width:100%}
+.page-title{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;letter-spacing:3px;margin-bottom:0.3rem}
+.page-title .g{color:var(--gold)}
+.gold-bar{width:50px;height:2px;background:var(--gold);margin:1rem 0 2rem}
+.card{background:var(--charcoal);border:1px solid var(--gold4);margin-bottom:1.5rem}
+.card-head{padding:1rem 1.5rem;border-bottom:1px solid var(--gold4);font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--gold)}
+.card-body{padding:1.5rem}
+.info-row{display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid rgba(201,168,76,0.1);font-size:0.87rem}
+.info-row:last-child{border-bottom:none}
+.info-row .k{color:var(--dim2)}
+.info-row .v{color:var(--white);font-weight:500}
+
+/* CALENDAR */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.cal-nav{background:none;border:1px solid var(--gold4);color:var(--white);width:34px;height:34px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.cal-nav:hover{background:rgba(201,168,76,0.12);border-color:var(--gold)}
+.cal-month{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:1.5rem}
+.cal-day-name{font-size:0.6rem;letter-spacing:2px;text-align:center;color:var(--dim2);padding:0.4rem 0;text-transform:uppercase}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:0.82rem;cursor:pointer;border:1px solid transparent;transition:all 0.2s;border-radius:2px}
+.cal-day:hover:not(.empty):not(.past){background:rgba(201,168,76,0.12);border-color:rgba(201,168,76,0.35)}
+.cal-day.selected{background:var(--gold);color:var(--black);font-weight:700}
+.cal-day.today{border-color:rgba(201,168,76,0.35);color:var(--gold)}
+.cal-day.past{color:rgba(245,240,232,0.18);cursor:not-allowed}
+.cal-day.empty{cursor:default}
+.cal-day.same-day{border-color:var(--gold);color:var(--gold)}
+.time-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:5px}
+.time-slot{padding:0.55rem 0.3rem;text-align:center;font-size:0.8rem;font-weight:500;border:1px solid var(--gold4);cursor:pointer;transition:all 0.2s}
+.time-slot:hover:not(.unavail):not(.current){background:rgba(201,168,76,0.12);border-color:var(--gold)}
+.time-slot.selected{background:var(--gold);color:var(--black);font-weight:700;border-color:var(--gold)}
+.time-slot.unavail{color:var(--dim2);cursor:not-allowed;border-color:rgba(245,240,232,0.07);text-decoration:line-through}
+.time-slot.current{border-color:var(--gold);color:var(--gold);cursor:not-allowed;opacity:0.6}
+
+/* SCREENS */
+.screen{display:none}
+.screen.active{display:block}
+
+/* BUTTONS */
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--black);padding:1rem 2.5rem;border:none;font-family:'Barlow',sans-serif;font-size:0.82rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-block}
+.btn-gold:hover{opacity:0.9}
+.btn-gold:disabled{opacity:0.3;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--dim);padding:1rem 1.5rem;border:1px solid var(--gold4);font-family:'Barlow',sans-serif;font-size:0.78rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+.btn-outline:hover{border-color:var(--gold);color:var(--white)}
+
+.spinner{width:36px;height:36px;border:3px solid rgba(201,168,76,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin:2rem auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.icon{font-size:3rem;margin-bottom:1rem;display:block;text-align:center}
+.msg-title{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;text-align:center;margin-bottom:0.5rem}
+.msg-body{color:var(--dim);line-height:1.7;text-align:center;margin-bottom:1rem}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html" class="nav-logo">BARBE-À-RAS</a>
+  <a href="tel:4186122007" class="nav-tel">418-612-2007</a>
+</nav>
+
+<div class="page">
+  <h1 class="page-title">Modifier mon <span class="g">rendez-vous</span></h1>
+  <div class="gold-bar"></div>
+
+  <!-- LOADING -->
+  <div class="screen active" id="screen-loading">
+    <div class="spinner"></div>
+    <p style="text-align:center;color:var(--dim2)">Chargement de votre rendez-vous...</p>
+  </div>
+
+  <!-- MODIFY FORM -->
+  <div class="screen" id="screen-modify">
+    <div class="card">
+      <div class="card-head">Rendez-vous actuel</div>
+      <div class="card-body" id="current-resa"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Choisir une nouvelle date</div>
+      <div class="card-body">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="prevMonth()">‹</button>
+          <span class="cal-month" id="cal-lbl"></span>
+          <button class="cal-nav" onclick="nextMonth()">›</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div id="time-section" style="display:none">
+          <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">
+            Créneaux disponibles — <span id="date-lbl"></span>
+          </div>
+          <div class="time-grid" id="time-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem">
+      <a href="index.html" class="btn-outline">← Retour au site</a>
+      <button class="btn-gold" id="btn-confirm" onclick="doModify()" disabled>Confirmer la modification →</button>
+    </div>
+  </div>
+
+  <!-- TOO LATE -->
+  <div class="screen" id="screen-late">
+    <span class="icon">⏰</span>
+    <div class="msg-title" style="color:var(--red)">Trop tard</div>
+    <p class="msg-body">La modification n'est plus possible — votre rendez-vous est dans moins de 3 heures.<br>Pour modifier, appelez directement le salon :</p>
+    <div style="text-align:center"><a href="tel:4186122007" class="btn-gold">📞 (418) 612-2007</a></div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="screen" id="screen-error">
+    <span class="icon">❌</span>
+    <div class="msg-title" style="color:var(--red)">Lien invalide</div>
+    <p class="msg-body">Ce lien est invalide ou expiré.</p>
+    <div style="text-align:center"><a href="tel:4186122007" class="btn-gold">📞 (418) 612-2007</a></div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="screen" id="screen-success">
+    <span class="icon">✅</span>
+    <div class="msg-title" style="color:var(--gold)">Rendez-vous modifié !</div>
+    <p class="msg-body" id="success-msg"></p>
+    <div style="text-align:center;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+      <a href="index.html" class="btn-gold">← Retour au site</a>
+    </div>
+  </div>
+
+  <!-- SLOT TAKEN -->
+  <div class="screen" id="screen-taken">
+    <span class="icon">🔴</span>
+    <div class="msg-title" style="color:var(--red)">Créneau pris</div>
+    <p class="msg-body">Ce créneau vient d'être pris. Choisissez un autre horaire.</p>
+    <div style="text-align:center"><button class="btn-outline" onclick="show('screen-modify')">Choisir un autre créneau</button></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const FR_M=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const FR_D=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+const params=new URLSearchParams(window.location.search);
+const token=params.get('token');
+const id=params.get('id');
+let resa=null;
+let selDate=null, selTime=null;
+let curMonth=new Date().getMonth(), curYear=new Date().getFullYear();
+
+function show(s){document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));document.getElementById(s).classList.add('active');}
+
+async function init(){
+  if(!token||!id){show('screen-error');return;}
+  const {data,error}=await sb.from('reservations').select('*,clients(prenom,nom,email,telephone)').eq('id',id).single();
+  if(error||!data){show('screen-error');return;}
+  if(data.cancel_token!==token){show('screen-error');return;}
+  if(data.statut==='annulé'){show('screen-error');return;}
+  const rdvDate=new Date(`${data.date_rdv}T${data.heure_rdv}`);
+  const diff=(rdvDate-new Date())/(1000*60*60);
+  if(diff<3){show('screen-late');return;}
+  resa=data;
+  const dateFormatted=new Date(data.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('current-resa').innerHTML=`
+    <div class="info-row"><span class="k">Barbier·ère</span><span class="v">${data.barbier}</span></div>
+    <div class="info-row"><span class="k">Service</span><span class="v">${data.service}</span></div>
+    <div class="info-row"><span class="k">Date actuelle</span><span class="v">${dateFormatted}</span></div>
+    <div class="info-row"><span class="k">Heure actuelle</span><span class="v">${data.heure_rdv?.substring(0,5)}</span></div>`;
+  // Set calendar to current reservation month
+  const rd=new Date(data.date_rdv+'T12:00:00');
+  curMonth=rd.getMonth();curYear=rd.getFullYear();
+  renderCal();
+  show('screen-modify');
+}
+
+function renderCal(){
+  document.getElementById('cal-lbl').textContent=FR_M[curMonth]+' '+curYear;
+  const grid=document.getElementById('cal-grid');grid.innerHTML='';
+  FR_D.forEach(d=>{const e=document.createElement('div');e.className='cal-day-name';e.textContent=d;grid.appendChild(e);});
+  const first=new Date(curYear,curMonth,1).getDay();
+  const days=new Date(curYear,curMonth+1,0).getDate();
+  const today=new Date();
+  for(let i=0;i<first;i++){const e=document.createElement('div');e.className='cal-day empty';grid.appendChild(e);}
+  for(let d=1;d<=days;d++){
+    const e=document.createElement('div');
+    const dt=new Date(curYear,curMonth,d);const dow=dt.getDay();
+    const isPast=dt<new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    const isOpen=dow>=2&&dow<=6;
+    const isCurrent=resa&&dt.toISOString().split('T')[0]===resa.date_rdv;
+    let cls='cal-day';
+    if(isPast||!isOpen)cls+=' past';
+    if(dt.toDateString()===today.toDateString())cls+=' today';
+    if(isCurrent)cls+=' same-day';
+    if(selDate&&dt.toISOString().split('T')[0]===selDate)cls+=' selected';
+    e.className=cls;e.textContent=d;
+    if(!isPast&&isOpen)e.onclick=()=>selDay(dt);
+    grid.appendChild(e);
+  }
+}
+
+function prevMonth(){if(curMonth===0){curMonth=11;curYear--;}else curMonth--;selDate=null;selTime=null;document.getElementById('time-section').style.display='none';document.getElementById('btn-confirm').disabled=true;renderCal();}
+function nextMonth(){if(curMonth===11){curMonth=0;curYear++;}else curMonth++;selDate=null;selTime=null;document.getElementById('time-section').style.display='none';document.getElementById('btn-confirm').disabled=true;renderCal();}
+
+async function selDay(dt){
+  selDate=dt.toISOString().split('T')[0];
+  selTime=null;document.getElementById('btn-confirm').disabled=true;
+  renderCal();
+  // Fetch booked slots
+  const {data:ex}=await sb.from('reservations').select('heure_rdv')
+    .eq('date_rdv',selDate).eq('barbier',resa.barbier).eq('statut','confirmé');
+  const booked=(ex||[]).map(r=>r.heure_rdv.substring(0,5));
+  const isSat=dt.getDay()===6;
+  const allSlots=isSat?['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']:
+    ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+  document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+  const grid=document.getElementById('time-grid');grid.innerHTML='';
+  const currentTime=resa.heure_rdv?.substring(0,5);
+  allSlots.forEach(t=>{
+    const e=document.createElement('div');
+    const isCurrent=selDate===resa.date_rdv&&t===currentTime;
+    const isBooked=booked.includes(t)&&!isCurrent;
+    let cls='time-slot';
+    if(isCurrent)cls+=' current';
+    else if(isBooked)cls+=' unavail';
+    e.className=cls;e.textContent=t;
+    if(t===selTime)e.classList.add('selected');
+    if(!isCurrent&&!isBooked)e.onclick=()=>selTimeSlot(e,t);
+    grid.appendChild(e);
+  });
+  document.getElementById('time-section').style.display='block';
+}
+
+function selTimeSlot(el,t){
+  document.querySelectorAll('.time-slot').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');selTime=t;
+  // Can't pick same date+time
+  const isSameSlot=selDate===resa.date_rdv&&t===resa.heure_rdv?.substring(0,5);
+  document.getElementById('btn-confirm').disabled=isSameSlot;
+}
+
+async function doModify(){
+  if(!selDate||!selTime)return;
+  document.getElementById('btn-confirm').disabled=true;
+  document.getElementById('btn-confirm').textContent='Modification en cours...';
+  try{
+    const resp=await fetch(`/.netlify/functions/cancel-booking?token=${token}&id=${id}&action=modify&new_date=${selDate}&new_time=${encodeURIComponent(selTime)}`);
+    const result=await resp.json();
+    if(result.error==='late'){show('screen-late');return;}
+    if(result.error==='slot_taken'){show('screen-taken');return;}
+    if(result.ok){
+      const newDateFormatted=new Date(selDate+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      document.getElementById('success-msg').innerHTML=
+        `Votre rendez-vous a été déplacé au <strong style="color:var(--gold)">${newDateFormatted} à ${selTime}</strong> avec ${resa.barbier}.<br><br>
+        ${resa.clients?.email?'Un courriel de confirmation vous a été envoyé.':'Un SMS de confirmation vous sera envoyé.'}`;
+      show('screen-success');
+    } else {
+      show('screen-error');
+    }
+  }catch(e){
+    show('screen-error');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
