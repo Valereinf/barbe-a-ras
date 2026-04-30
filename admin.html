@@ -152,6 +152,26 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
 /* EMPTY STATE */
 .empty{text-align:center;padding:3rem;color:var(--dim2);font-size:0.9rem}
 
+/* CALENDAR VIEW */
+.cal-slot{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.6rem 1rem;border-bottom:1px solid rgba(201,168,76,0.07);
+  font-size:0.83rem;cursor:pointer;transition:background 0.15s;
+}
+.cal-slot:hover{background:rgba(201,168,76,0.05)}
+.cal-slot.booked{background:rgba(201,168,76,0.08);cursor:default}
+.cal-slot.booked:hover{background:rgba(201,168,76,0.08)}
+.cal-slot.free{background:rgba(39,174,96,0.04)}
+.cal-slot.free:hover{background:rgba(39,174,96,0.1)}
+.cal-slot .slot-time{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;color:var(--dim2);min-width:50px}
+.cal-slot.booked .slot-time{color:var(--gold)}
+.cal-slot .slot-info{flex:1;margin:0 0.8rem;font-size:0.82rem}
+.cal-slot .slot-name{color:var(--white);font-weight:500}
+.cal-slot .slot-svc{color:var(--dim2);font-size:0.75rem;margin-top:1px}
+.cal-slot .slot-badge{font-size:0.6rem;letter-spacing:1px;padding:0.1rem 0.4rem;border-radius:2px}
+.cal-slot.free .slot-badge{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
+.cal-slot.booked .slot-badge{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
+
 /* TOAST */
 .toast{position:fixed;bottom:2rem;right:2rem;background:var(--charcoal);
   border:1px solid var(--gold4);padding:0.8rem 1.5rem;font-size:0.85rem;
@@ -205,6 +225,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
       <div class="nav-item active" onclick="showTab('dashboard')" id="nav-dashboard">
         <span class="ico">📊</span>Tableau de bord
       </div>
+      <div class="nav-item" onclick="showTab('calendrier')" id="nav-calendrier">
+        <span class="ico">🗓️</span>Calendrier
+      </div>
       <div class="nav-item" onclick="showTab('reservations')" id="nav-reservations">
         <span class="ico">📅</span>Réservations
       </div>
@@ -221,6 +244,54 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
 
     <!-- CONTENT -->
     <div class="content">
+
+      <!-- CALENDRIER -->
+      <div class="tab" id="tab-calendrier">
+        <div class="sec-head">
+          <h2>Calendrier <span>du jour</span></h2>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input type="date" id="cal-date-picker" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.4rem 0.7rem;font-family:'Barlow',sans-serif;font-size:0.85rem;outline:none;cursor:pointer" onchange="loadCalendrier(this.value)">
+            <button class="btn-sm btn-gold-sm" onclick="loadCalendrier()">↻ Aujourd'hui</button>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--dim2);margin-bottom:1rem;letter-spacing:1px" id="cal-date-label"></div>
+
+        <!-- LÉGENDE -->
+        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
+            <div style="width:12px;height:12px;background:var(--gold);border-radius:2px"></div>Barbara Sandra
+          </div>
+          <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
+            <div style="width:12px;height:12px;background:var(--blue);border-radius:2px"></div>Michael
+          </div>
+          <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
+            <div style="width:12px;height:12px;background:rgba(39,174,96,0.3);border:1px solid var(--green);border-radius:2px"></div>Disponible
+          </div>
+        </div>
+
+        <!-- CALENDRIER CÔTE À CÔTE -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--gold4)">
+          <!-- BARBARA -->
+          <div style="background:var(--charcoal)">
+            <div style="padding:0.8rem 1rem;background:rgba(201,168,76,0.15);border-bottom:2px solid var(--gold);display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold)">✂ Barbara Sandra</span>
+              <span style="font-size:0.65rem;color:var(--dim2)" id="cal-barbara-count"></span>
+            </div>
+            <div id="cal-barbara"></div>
+          </div>
+          <!-- MICHAEL -->
+          <div style="background:var(--charcoal)">
+            <div style="padding:0.8rem 1rem;background:rgba(52,152,219,0.1);border-bottom:2px solid var(--blue);display:flex;justify-content:space-between;align-items:center">
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--blue)">✂ Michael</span>
+              <span style="font-size:0.65rem;color:var(--dim2)" id="cal-michael-count"></span>
+            </div>
+            <div id="cal-michael"></div>
+          </div>
+        </div>
+        <div style="margin-top:1rem;font-size:0.75rem;color:var(--dim2);padding:0.8rem;border:1px solid var(--gold4);background:rgba(201,168,76,0.03)">
+          💡 Les créneaux <strong style="color:var(--green)">verts</strong> sont disponibles — proposez-les aux clients qui appellent par téléphone.
+        </div>
+      </div>
 
       <!-- DASHBOARD -->
       <div class="tab active" id="tab-dashboard">
@@ -761,6 +832,107 @@ function showTab(name) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('nav-'+name).classList.add('active');
+  if(name==='calendrier') loadCalendrier();
+}
+
+// ═══════════════════════════════════════════
+// CALENDRIER — vue côte à côte
+// ═══════════════════════════════════════════
+async function loadCalendrier(dateStr) {
+  const picker = document.getElementById('cal-date-picker');
+  if(!dateStr) {
+    dateStr = new Date().toISOString().split('T')[0];
+    picker.value = dateStr;
+  } else {
+    picker.value = dateStr;
+  }
+
+  const dt = new Date(dateStr + 'T12:00:00');
+  const dow = dt.getDay();
+  const label = document.getElementById('cal-date-label');
+
+  // Check if open day
+  const isOpen = dow >= 2 && dow <= 6;
+  const isSat = dow === 6;
+  const dateFormatted = dt.toLocaleDateString('fr-CA', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  label.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
+
+  if(!isOpen) {
+    document.getElementById('cal-barbara').innerHTML = '<div class="empty" style="padding:2rem">Salon fermé ce jour</div>';
+    document.getElementById('cal-michael').innerHTML = '<div class="empty" style="padding:2rem">Salon fermé ce jour</div>';
+    document.getElementById('cal-barbara-count').textContent = '';
+    document.getElementById('cal-michael-count').textContent = '';
+    return;
+  }
+
+  const allSlots = isSat
+    ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']
+    : ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+
+  // Fetch reservations for both
+  const [rB, rM] = await Promise.all([
+    sb.from('reservations')
+      .select('heure_rdv,service,clients(prenom,nom)')
+      .eq('date_rdv', dateStr)
+      .eq('barbier', 'Barbara Sandra')
+      .eq('statut', 'confirmé'),
+    sb.from('reservations')
+      .select('heure_rdv,service,clients(prenom,nom)')
+      .eq('date_rdv', dateStr)
+      .eq('barbier', 'Michael')
+      .eq('statut', 'confirmé')
+  ]);
+
+  const resaBarbara = rB.data || [];
+  const resaMichael = rM.data || [];
+
+  const bookedB = {};
+  resaBarbara.forEach(r => { bookedB[r.heure_rdv.substring(0,5)] = r; });
+  const bookedM = {};
+  resaMichael.forEach(r => { bookedM[r.heure_rdv.substring(0,5)] = r; });
+
+  const freeB = allSlots.filter(t => !bookedB[t]).length;
+  const freeM = allSlots.filter(t => !bookedM[t]).length;
+  document.getElementById('cal-barbara-count').textContent = `${resaBarbara.length} RDV · ${freeB} libres`;
+  document.getElementById('cal-michael-count').textContent = `${resaMichael.length} RDV · ${freeM} libres`;
+
+  function renderCol(el, booked) {
+    if(allSlots.length === 0) { el.innerHTML = '<div class="empty" style="padding:2rem">Fermé</div>'; return; }
+    el.innerHTML = allSlots.map(t => {
+      const r = booked[t];
+      if(r) {
+        const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
+        const svc = r.service ? r.service.substring(0,30)+(r.service.length>30?'…':'') : '—';
+        return `<div class="cal-slot booked" onclick="openResaByTime('${dateStr}','${t}')">
+          <span class="slot-time">${t}</span>
+          <div class="slot-info">
+            <div class="slot-name">${nom}</div>
+            <div class="slot-svc">${svc}</div>
+          </div>
+          <span class="slot-badge">RDV</span>
+        </div>`;
+      } else {
+        return `<div class="cal-slot free">
+          <span class="slot-time">${t}</span>
+          <div class="slot-info"><div class="slot-svc" style="color:var(--green)">Disponible</div></div>
+          <span class="slot-badge">Libre</span>
+        </div>`;
+      }
+    }).join('');
+  }
+
+  renderCol(document.getElementById('cal-barbara'), bookedB);
+  renderCol(document.getElementById('cal-michael'), bookedM);
+}
+
+async function openResaByTime(dateStr, heure) {
+  const {data} = await sb.from('reservations')
+    .select('id')
+    .eq('date_rdv', dateStr)
+    .eq('heure_rdv', heure+':00')
+    .eq('statut', 'confirmé')
+    .single();
+  if(data) openResaModal(data.id);
 }
 
 function closeModal(id) {
