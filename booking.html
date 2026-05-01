@@ -554,17 +554,80 @@ async function selDay(d,dt,el){
   document.getElementById('time-sec').style.display='none';
   showOverlay('Vérification des disponibilités...');
   const dateStr=dt.toISOString().split('T')[0];
+
+  // Fetch reservations AND indisponibilites in parallel
+  const queries = [
+    sb.from('indisponibilites').select('*')
+      .lte('date_debut', dateStr).gte('date_fin', dateStr)
+  ];
+
   if(S.barber==='Sans préférence'){
-    const [rM,rB]=await Promise.all([
+    queries.push(
       sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier','Michael').eq('statut','confirmé'),
       sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier','Barbara Sandra').eq('statut','confirmé')
-    ]);
+    );
+    const [indiResp, rM, rB] = await Promise.all(queries);
     hideOverlay();
-    showTimesNoPreference(dt,(rM.data||[]).map(r=>r.heure_rdv.substring(0,5)),(rB.data||[]).map(r=>r.heure_rdv.substring(0,5)));
+    const indis = indiResp.data || [];
+    const michaelBlocked = isBarberBlocked(indis, 'Michael', dateStr);
+    const barbaraBlocked = isBarberBlocked(indis, 'Barbara Sandra', dateStr);
+    const blockedSlotsM = getBlockedSlots(indis, 'Michael', dt);
+    const blockedSlotsB = getBlockedSlots(indis, 'Barbara Sandra', dt);
+    const bookedM = (rM.data||[]).map(r=>r.heure_rdv.substring(0,5));
+    const bookedB = (rB.data||[]).map(r=>r.heure_rdv.substring(0,5));
+    showTimesNoPreference(dt,
+      michaelBlocked ? 'all' : [...bookedM, ...blockedSlotsM],
+      barbaraBlocked ? 'all' : [...bookedB, ...blockedSlotsB]
+    );
   } else {
-    const {data:ex}=await sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier',S.barber).eq('statut','confirmé');
-    hideOverlay();showTimes(dt,(ex||[]).map(r=>r.heure_rdv.substring(0,5)));
+    queries.push(
+      sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier',S.barber).eq('statut','confirmé')
+    );
+    const [indiResp, resaResp] = await Promise.all(queries);
+    hideOverlay();
+    const indis = indiResp.data || [];
+    const barberBlocked = isBarberBlocked(indis, S.barber, dateStr);
+    if(barberBlocked) {
+      const indi = indis.find(i=>i.barbier===S.barber||i.barbier==='Tous');
+      document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+      document.getElementById('time-grid').innerHTML=`
+        <div style="grid-column:1/-1;padding:1.2rem;background:rgba(231,76,60,0.08);
+          border:1px solid rgba(231,76,60,0.3);text-align:center;color:var(--red);font-size:0.85rem">
+          🔴 <strong>${S.barber}</strong> est indisponible ce jour<br>
+          <span style="font-size:0.78rem;color:var(--dim2);margin-top:0.3rem;display:block">
+            ${indi?.raison||'Congé'}</span>
+        </div>`;
+      document.getElementById('time-sec').style.display='block';
+      return;
+    }
+    const blockedSlots = getBlockedSlots(indis, S.barber, dt);
+    const bookedTimes = (resaResp.data||[]).map(r=>r.heure_rdv.substring(0,5));
+    showTimes(dt, [...bookedTimes, ...blockedSlots]);
   }
+}
+
+// Check if a barber is fully blocked (journée complète)
+function isBarberBlocked(indis, barbier, dateStr) {
+  return indis.some(i =>
+    (i.barbier === barbier || i.barbier === 'Tous') &&
+    !i.heure_debut && !i.heure_fin
+  );
+}
+
+// Get specific blocked time slots from indisponibilites
+function getBlockedSlots(indis, barbier, dt) {
+  const blocked = [];
+  const allSlots = getAllSlots(dt);
+  indis.forEach(indi => {
+    if((indi.barbier === barbier || indi.barbier === 'Tous') && indi.heure_debut && indi.heure_fin) {
+      const start = indi.heure_debut.substring(0,5);
+      const end = indi.heure_fin.substring(0,5);
+      allSlots.forEach(slot => {
+        if(slot >= start && slot < end) blocked.push(slot);
+      });
+    }
+  });
+  return blocked;
 }
 
 function showTimes(dt,bookedTimes=[]){
@@ -585,21 +648,33 @@ function showTimes(dt,bookedTimes=[]){
 function showTimesNoPreference(dt,bookedMichael=[],bookedBarbara=[]){
   const allSlots=getAllSlots(dt);
   document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
-  const freeMichael=allSlots.filter(t=>!bookedMichael.includes(t));
-  const freeBarbara=allSlots.filter(t=>!bookedBarbara.includes(t));
+  const michaelAllBlocked = bookedMichael === 'all';
+  const barbaraAllBlocked = bookedBarbara === 'all';
+  const bM = michaelAllBlocked ? allSlots : bookedMichael;
+  const bB = barbaraAllBlocked ? allSlots : bookedBarbara;
+  const freeMichael = michaelAllBlocked ? [] : allSlots.filter(t=>!bM.includes(t));
+  const freeBarbara = barbaraAllBlocked ? [] : allSlots.filter(t=>!bB.includes(t));
   if(freeMichael.length===0&&freeBarbara.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
   const grid=document.getElementById('time-grid');grid.innerHTML='';
-  if(freeMichael.length>0){
+  if(!michaelAllBlocked){
     const lbl=document.createElement('div');
     lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
     lbl.textContent='✂ Michael — disponible';grid.appendChild(lbl);
-    allSlots.forEach(t=>{const e=document.createElement('div');const un=bookedMichael.includes(t);e.className='time-slot'+(un?' unavail':'');e.textContent=t;if(!un)e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
+    allSlots.forEach(t=>{const e=document.createElement('div');const un=bM.includes(t);e.className='time-slot'+(un?' unavail':'');e.textContent=t;if(!un)e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
+  } else {
+    const lbl=document.createElement('div');
+    lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:0.5rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px';
+    lbl.textContent='🔴 Michael — indisponible ce jour';grid.appendChild(lbl);
   }
-  if(freeBarbara.length>0){
+  if(!barbaraAllBlocked){
     const lbl2=document.createElement('div');
     lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
     lbl2.textContent='✂ Barbara Sandra — disponible';grid.appendChild(lbl2);
-    allSlots.forEach(t=>{const e=document.createElement('div');const un=bookedBarbara.includes(t);e.className='time-slot'+(un?' unavail':'');e.textContent=t;if(!un)e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
+    allSlots.forEach(t=>{const e=document.createElement('div');const un=bB.includes(t);e.className='time-slot'+(un?' unavail':'');e.textContent=t;if(!un)e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
+  } else {
+    const lbl2=document.createElement('div');
+    lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:1rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px;margin-top:0.5rem';
+    lbl2.textContent='🔴 Barbara Sandra — indisponible ce jour';grid.appendChild(lbl2);
   }
   document.getElementById('time-sec').style.display='block';
 }
