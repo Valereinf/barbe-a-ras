@@ -394,9 +394,9 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
         </div>
         <table class="data-table">
           <thead><tr>
-            <th>Barbier</th><th>Date début</th><th>Date fin</th><th>Raison</th><th>Actions</th>
+            <th>Barbier</th><th>Date début</th><th>Date fin</th><th>Heures</th><th>Raison</th><th>Actions</th>
           </tr></thead>
-          <tbody id="indi-tbody"><tr><td colspan="5" class="empty">Chargement...</td></tr></tbody>
+          <tbody id="indi-tbody"><tr><td colspan="6" class="empty">Chargement...</td></tr></tbody>
         </table>
       </div>
 
@@ -507,6 +507,46 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
       </div>
       <div class="field"><label>Date début</label><input type="date" id="indi-debut"></div>
       <div class="field"><label>Date fin</label><input type="date" id="indi-fin"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="field">
+          <label>Heure début <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label>
+          <select id="indi-heure-debut">
+            <option value="">Journée complète</option>
+            <option>08:00</option><option>08:30</option>
+            <option>09:00</option><option>09:30</option>
+            <option>10:00</option><option>10:30</option>
+            <option>11:00</option><option>11:30</option>
+            <option>12:00</option><option>12:30</option>
+            <option>13:00</option><option>13:30</option>
+            <option>14:00</option><option>14:30</option>
+            <option>15:00</option><option>15:30</option>
+            <option>16:00</option><option>16:30</option>
+            <option>17:00</option><option>17:30</option>
+            <option>18:00</option><option>18:30</option>
+            <option>19:00</option><option>19:30</option>
+            <option>20:00</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Heure fin <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label>
+          <select id="indi-heure-fin">
+            <option value="">Journée complète</option>
+            <option>08:00</option><option>08:30</option>
+            <option>09:00</option><option>09:30</option>
+            <option>10:00</option><option>10:30</option>
+            <option>11:00</option><option>11:30</option>
+            <option>12:00</option><option>12:30</option>
+            <option>13:00</option><option>13:30</option>
+            <option>14:00</option><option>14:30</option>
+            <option>15:00</option><option>15:30</option>
+            <option>16:00</option><option>16:30</option>
+            <option>17:00</option><option>17:30</option>
+            <option>18:00</option><option>18:30</option>
+            <option>19:00</option><option>19:30</option>
+            <option>20:00</option>
+          </select>
+        </div>
+      </div>
       <div class="field">
         <label>Raison <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label>
         <input type="text" id="indi-raison" placeholder="Ex: Vacances, Maladie, Formation...">
@@ -1365,19 +1405,25 @@ async function loadIndisponibilites() {
   const {data} = await sb.from('indisponibilites').select('*').order('date_debut',{ascending:true});
   const tbody = document.getElementById('indi-tbody');
   if(!data||data.length===0){
-    tbody.innerHTML='<tr><td colspan="5" class="empty">Aucune indisponibilité enregistrée</td></tr>';return;
+    tbody.innerHTML='<tr><td colspan="6" class="empty">Aucune indisponibilité enregistrée</td></tr>';return;
   }
-  tbody.innerHTML = data.map(d=>`
-    <tr>
+  tbody.innerHTML = data.map(d=>{
+    const heures = d.heure_debut && d.heure_fin
+      ? `${d.heure_debut.substring(0,5)} → ${d.heure_fin.substring(0,5)}`
+      : 'Journée complète';
+    return `<tr>
       <td><strong style="color:${d.barbier==='Michael'?'var(--blue)':'var(--gold)'}">${d.barbier}</strong></td>
       <td>${d.date_debut}</td>
       <td>${d.date_fin}</td>
+      <td style="font-size:0.82rem;color:var(--dim2)">${heures}</td>
       <td style="color:var(--dim2);font-size:0.82rem">${d.raison||'—'}</td>
       <td style="white-space:nowrap">
-        <button class="btn-sm btn-info" style="margin-right:4px" onclick="openEditIndiModal('${d.id}','${d.barbier}','${d.date_debut}','${d.date_fin}','${d.raison||''}')">✏️ Modifier</button>
+        <button class="btn-sm btn-info" style="margin-right:4px" 
+          onclick="openEditIndiModal('${d.id}','${d.barbier}','${d.date_debut}','${d.date_fin}','${d.raison||''}','${d.heure_debut||''}','${d.heure_fin||''}')">✏️ Modifier</button>
         <button class="btn-sm btn-danger" onclick="deleteIndi('${d.id}')">Supprimer</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function openIndiModal() {
@@ -1386,16 +1432,20 @@ function openIndiModal() {
   document.getElementById('indi-barbier').value = 'Barbara Sandra';
   document.getElementById('indi-debut').value = '';
   document.getElementById('indi-fin').value = '';
+  document.getElementById('indi-heure-debut').value = '';
+  document.getElementById('indi-heure-fin').value = '';
   document.getElementById('indi-raison').value = '';
   document.getElementById('modal-indi').classList.add('open');
 }
 
-function openEditIndiModal(id, barbier, debut, fin, raison) {
+function openEditIndiModal(id, barbier, debut, fin, raison, heureDebut, heureFin) {
   document.getElementById('indi-id').value = id;
   document.getElementById('indi-modal-title').textContent = '✏️ Modifier l\'indisponibilité';
   document.getElementById('indi-barbier').value = barbier;
   document.getElementById('indi-debut').value = debut;
   document.getElementById('indi-fin').value = fin;
+  document.getElementById('indi-heure-debut').value = heureDebut ? heureDebut.substring(0,5) : '';
+  document.getElementById('indi-heure-fin').value = heureFin ? heureFin.substring(0,5) : '';
   document.getElementById('indi-raison').value = raison;
   document.getElementById('modal-indi').classList.add('open');
 }
@@ -1405,13 +1455,21 @@ async function saveIndi() {
   const barbier = document.getElementById('indi-barbier').value;
   const debut = document.getElementById('indi-debut').value;
   const fin = document.getElementById('indi-fin').value;
+  const heureDebut = document.getElementById('indi-heure-debut').value;
+  const heureFin = document.getElementById('indi-heure-fin').value;
   const raison = document.getElementById('indi-raison').value.trim();
   if(!debut||!fin){showToast('Dates requises','err');return;}
   if(fin < debut){showToast('La date de fin doit être après la date de début','err');return;}
+  const payload = {
+    barbier, date_debut:debut, date_fin:fin,
+    heure_debut: heureDebut || null,
+    heure_fin: heureFin || null,
+    raison: raison || null
+  };
   if(id) {
-    await sb.from('indisponibilites').update({barbier,date_debut:debut,date_fin:fin,raison:raison||null}).eq('id',id);
+    await sb.from('indisponibilites').update(payload).eq('id',id);
   } else {
-    await sb.from('indisponibilites').insert({barbier,date_debut:debut,date_fin:fin,raison:raison||null});
+    await sb.from('indisponibilites').insert(payload);
   }
   showToast('Indisponibilité sauvegardée ✅','ok');
   closeModal('modal-indi');
