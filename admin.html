@@ -987,6 +987,13 @@ async function openResaModal(id) {
       <div class="info-row"><span class="k">Téléphone</span><span class="v">${client.telephone||'—'}</span></div>
       <div class="info-row"><span class="k">Courriel</span><span class="v">${client.email||'—'}</span></div>
       <div class="info-row"><span class="k">Service</span><span class="v">${resa.service||'—'}</span></div>
+      <div class="info-row"><span class="k">Durée</span><span class="v">${(()=>{const d=({
+        'Coupe de cheveux adulte':30,'Coupe enfant (0-15 ans)':30,
+        'Cheveux + barbe à la lame serviette chaude':60,'Coupe de cheveux long à court':45,
+        'Coupe + barbe au clipper':45,'Coupe + shampoing':30,
+        'Barbe à la lame + serviettes chaudes':30,'Cheveux + barbe lame + shampoing':60,
+        'Coupe adulte hors heures':30,'Coupe + barbe lame hors heures':60
+      })[resa.service];return d===60?'1 heure':d?d+' min':'—';})()}</span></div>
       <div class="info-row"><span class="k">Barbier·ère</span><span class="v">${resa.barbier||'—'}</span></div>
       <div class="info-row"><span class="k">Date</span><span class="v">${resa.date_rdv||'—'}</span></div>
       <div class="info-row"><span class="k">Heure</span><span class="v">${resa.heure_rdv?.substring(0,5)||'—'}</span></div>
