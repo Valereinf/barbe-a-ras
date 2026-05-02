@@ -114,7 +114,8 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
 .horaire-toggle input:checked+.horaire-toggle-slider::before{transform:translateX(18px);background:var(--black)}
 .horaire-fields{display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center}
 .horaire-field-group{display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--dim2)}
-.horaire-field-group input[type=time]{background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-family:'Barlow',sans-serif;font-size:0.82rem;outline:none;width:88px}
+.horaire-field-group input[type=time]{background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-family:'Barlow',sans-serif;font-size:0.82rem;outline:none;width:110px}
+input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .horaire-field-group input[type=time]:focus{border-color:var(--gold)}
 .pause-list{margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center}
 .pause-item{display:flex;align-items:center;gap:0.4rem;background:rgba(201,168,76,0.06);border:1px solid var(--gold4);padding:0.3rem 0.6rem;font-size:0.75rem}
@@ -1731,7 +1732,7 @@ async function loadHorairesSalon() {
   } else {
     // Upsert les défauts si table vide
     horairesSalonData = DEFAULT_SALON;
-    await sb.from('horaires_salon').upsert(DEFAULT_SALON.map(h=>({...h})));
+    await sb.from('horaires_salon').upsert(DEFAULT_SALON.map(h=>({...h})), {onConflict: 'dow'});
   }
   renderHorairesSalon();
 }
@@ -1749,7 +1750,7 @@ async function loadHorairesCollab() {
         rows.push({barbier, dow:h.dow, actif:h.actif, debut:h.debut, fin:h.fin, pauses:h.pauses});
       }
     }
-    await sb.from('horaires_collaborateurs').upsert(rows);
+    await sb.from('horaires_collaborateurs').upsert(rows, {onConflict: 'barbier,dow'});
   }
   renderHorairesCollab();
 }
@@ -1799,7 +1800,7 @@ async function saveHorairesSalon() {
     const fin    = document.getElementById('salon-fin-'+h.dow)?.value   || h.fin;
     return { dow: h.dow, ouvert, debut, fin };
   });
-  const {error} = await sb.from('horaires_salon').upsert(rows);
+  const {error} = await sb.from('horaires_salon').upsert(rows, {onConflict: 'dow'});
   if(error) { showToast('Erreur sauvegarde: '+error.message,'error'); return; }
   horairesSalonData = rows;
   showToast("Heures d'ouverture sauvegardées ✓", 'success');
@@ -1818,9 +1819,9 @@ function renderCollabGrid(barbier, containerId) {
   grid.innerHTML = jours.map(h => {
     const pausesHtml = (h.pauses||[]).map((p,pi) => `
       <div class="pause-item" id="pause-${barbier.replace(' ','-')}-${h.dow}-${pi}">
-        <input type="time" value="${p.debut}" id="p-debut-${barbier.replace(' ','-')}-${h.dow}-${pi}" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:80px">
+        <input type="time" value="${p.debut}" id="p-debut-${barbier.replace(' ','-')}-${h.dow}-${pi}" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:100px" step="900">
         <span>–</span>
-        <input type="time" value="${p.fin}" id="p-fin-${barbier.replace(' ','-')}-${h.dow}-${pi}" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:80px">
+        <input type="time" value="${p.fin}" id="p-fin-${barbier.replace(' ','-')}-${h.dow}-${pi}" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:100px" step="900">
         <button class="pause-remove" onclick="removePause('${barbier}',${h.dow},${pi})">✕</button>
       </div>`).join('');
     return `
@@ -1898,7 +1899,7 @@ async function saveHorairesCollab() {
     ...collectCollabData('Barbara Sandra'),
     ...collectCollabData('Michael')
   ];
-  const {error} = await sb.from('horaires_collaborateurs').upsert(rows);
+  const {error} = await sb.from('horaires_collaborateurs').upsert(rows, {onConflict: 'barbier,dow'});
   if(error) { showToast('Erreur sauvegarde: '+error.message,'error'); return; }
   horairesCollabData['Barbara Sandra'] = rows.filter(r=>r.barbier==='Barbara Sandra');
   horairesCollabData['Michael'] = rows.filter(r=>r.barbier==='Michael');
