@@ -532,11 +532,18 @@ async function ensureHoraires() {
     sb.from('horaires_salon').select('*').order('dow'),
     sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
   ]);
-  _horairesSalon = salonResp.data && salonResp.data.length===7 ? salonResp.data : null;
+  if(salonResp.data && salonResp.data.length===7) {
+    _horairesSalon = salonResp.data.map(r=>({...r, dow:parseInt(r.dow)}));
+  } else {
+    _horairesSalon = null;
+  }
   if(collabResp.data && collabResp.data.length>=14) {
     _horairesCollab = {};
     for(const r of collabResp.data) {
       if(!_horairesCollab[r.barbier]) _horairesCollab[r.barbier]=[];
+      // S'assurer que pauses est un tableau (Supabase JSONB peut arriver en string)
+      r.pauses = typeof r.pauses === 'string' ? JSON.parse(r.pauses) : (r.pauses || []);
+      r.dow = parseInt(r.dow);
       _horairesCollab[r.barbier].push(r);
     }
   }
@@ -546,7 +553,7 @@ async function ensureHoraires() {
 function getBarberDayRange(barber, dt) {
   const dow = dt.getDay();
   if(_horairesCollab && _horairesCollab[barber]) {
-    const h = _horairesCollab[barber].find(r=>r.dow===dow);
+    const h = _horairesCollab[barber].find(r=>parseInt(r.dow)===dow);
     if(h) return h.actif ? {start:toMins(h.debut),end:toMins(h.fin),pauses:h.pauses||[]} : null;
   }
   // Fallback hardcodé
@@ -562,7 +569,7 @@ function getBarberDayRange(barber, dt) {
 function getSalonDayRange(dt) {
   const dow = dt.getDay();
   if(_horairesSalon) {
-    const h = _horairesSalon.find(r=>r.dow===dow);
+    const h = _horairesSalon.find(r=>parseInt(r.dow)===dow);
     if(h) return h.ouvert ? {start:toMins(h.debut),end:toMins(h.fin)} : null;
   }
   // Fallback
