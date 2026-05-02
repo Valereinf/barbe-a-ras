@@ -1774,11 +1774,11 @@ function renderHorairesSalon() {
         <div class="horaire-fields">
           <div class="horaire-field-group">
             <span>Ouverture</span>
-            <input type="time" id="salon-debut-${h.dow}" value="${h.debut}">
+            <input type="text" id="salon-debut-${h.dow}" value="${h.debut}" placeholder="09:00" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-size:0.82rem;outline:none;width:70px;text-align:center;letter-spacing:1px">
           </div>
           <div class="horaire-field-group">
             <span>Fermeture</span>
-            <input type="time" id="salon-fin-${h.dow}" value="${h.fin}">
+            <input type="text" id="salon-fin-${h.dow}" value="${h.fin}" placeholder="17:00" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-size:0.82rem;outline:none;width:70px;text-align:center;letter-spacing:1px">
           </div>
         </div>
       </div>
@@ -1800,6 +1800,8 @@ async function saveHorairesSalon() {
     const fin    = document.getElementById('salon-fin-'+h.dow)?.value   || h.fin;
     return { dow: h.dow, ouvert, debut, fin };
   });
+  const errMsg = validateHoraires(rows.filter(r=>r.ouvert).map(r=>({...r, actif:true, pauses:[]})));
+  if(errMsg) { showToast('⚠ ' + errMsg, 'error'); return; }
   const {error} = await sb.from('horaires_salon').upsert(rows, {onConflict: 'dow'});
   if(error) { showToast('Erreur sauvegarde: '+error.message,'error'); return; }
   horairesSalonData = rows;
@@ -1819,9 +1821,9 @@ function renderCollabGrid(barbier, containerId) {
   grid.innerHTML = jours.map(h => {
     const pausesHtml = (h.pauses||[]).map((p,pi) => `
       <div class="pause-item" id="pause-${barbier.replace(' ','-')}-${h.dow}-${pi}">
-        <input type="time" value="${p.debut}" id="p-debut-${barbier.replace(' ','-')}-${h.dow}-${pi}" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:100px" step="900">
+        <input type="text" value="${p.debut}" id="p-debut-${barbier.replace(' ','-')}-${h.dow}-${pi}" placeholder="13:00" maxlength="5" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:65px;text-align:center;letter-spacing:1px">
         <span>–</span>
-        <input type="time" value="${p.fin}" id="p-fin-${barbier.replace(' ','-')}-${h.dow}-${pi}" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:100px" step="900">
+        <input type="text" value="${p.fin}" id="p-fin-${barbier.replace(' ','-')}-${h.dow}-${pi}" placeholder="13:30" maxlength="5" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.2rem 0.4rem;font-size:0.75rem;width:65px;text-align:center;letter-spacing:1px">
         <button class="pause-remove" onclick="removePause('${barbier}',${h.dow},${pi})">✕</button>
       </div>`).join('');
     return `
@@ -1839,11 +1841,11 @@ function renderCollabGrid(barbier, containerId) {
         <div class="horaire-fields">
           <div class="horaire-field-group">
             <span>Début</span>
-            <input type="time" id="collab-debut-${barbier.replace(' ','-')}-${h.dow}" value="${h.debut}">
+            <input type="text" id="collab-debut-${barbier.replace(' ','-')}-${h.dow}" value="${h.debut}" placeholder="09:00" maxlength="5" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-size:0.82rem;outline:none;width:70px;text-align:center;letter-spacing:1px">
           </div>
           <div class="horaire-field-group">
             <span>Fin</span>
-            <input type="time" id="collab-fin-${barbier.replace(' ','-')}-${h.dow}" value="${h.fin}">
+            <input type="text" id="collab-fin-${barbier.replace(' ','-')}-${h.dow}" value="${h.fin}" placeholder="17:00" maxlength="5" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-size:0.82rem;outline:none;width:70px;text-align:center;letter-spacing:1px">
           </div>
         </div>
         <div class="pause-list" id="pauses-${barbier.replace(' ','-')}-${h.dow}">
@@ -1899,12 +1901,48 @@ async function saveHorairesCollab() {
     ...collectCollabData('Barbara Sandra'),
     ...collectCollabData('Michael')
   ];
+  const errMsg = validateHoraires(rows);
+  if(errMsg) { showToast('⚠ ' + errMsg, 'error'); return; }
   const {error} = await sb.from('horaires_collaborateurs').upsert(rows, {onConflict: 'barbier,dow'});
   if(error) { showToast('Erreur sauvegarde: '+error.message,'error'); return; }
   horairesCollabData['Barbara Sandra'] = rows.filter(r=>r.barbier==='Barbara Sandra');
   horairesCollabData['Michael'] = rows.filter(r=>r.barbier==='Michael');
   showToast('Horaires collaborateurs sauvegardés ✓','success');
 }
+// Auto-format HH:MM pendant la saisie
+function fmtTime(el) {
+  let v = el.value.replace(/[^0-9]/g,'');
+  if(v.length >= 3) v = v.slice(0,2) + ':' + v.slice(2,4);
+  el.value = v;
+  // Valider format HH:MM
+  const ok = /^([01]\d|2[0-3]):[0-5]\d$/.test(el.value);
+  el.style.borderColor = ok ? 'var(--gold4)' : 'var(--red)';
+}
+
+function toMinsAdmin(t) {
+  if(!t || !t.includes(':')) return -1;
+  const [h,m] = t.split(':').map(Number);
+  return h*60+m;
+}
+
+function validateHoraires(rows) {
+  for(const r of rows) {
+    if(!r.actif) continue;
+    const debut = toMinsAdmin(r.debut);
+    const fin   = toMinsAdmin(r.fin);
+    if(debut < 0 || fin < 0) return `Format invalide pour ${r.barbier||'salon'} ${['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][r.dow]}`;
+    if(fin <= debut) return `${r.barbier||'Salon'} ${['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][r.dow]} : l'heure de fin doit être après le début`;
+    for(const [pi, p] of (r.pauses||[]).entries()) {
+      const pd = toMinsAdmin(p.debut);
+      const pf = toMinsAdmin(p.fin);
+      if(pd < 0 || pf < 0) return `Format de pause invalide`;
+      if(pf <= pd) return `Pause ${pi+1} (${['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][r.dow]}) : la fin doit être après le début`;
+      if(pd < debut || pf > fin) return `Pause ${pi+1} (${['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][r.dow]}) : la pause doit être dans les heures de travail`;
+    }
+  }
+  return null; // OK
+}
+
 function showToast(msg, type='') {
   const t=document.getElementById('toast');
   t.textContent=msg; t.className='toast show'+(type?' '+type:'');
