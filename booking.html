@@ -86,7 +86,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
 .time-slot{padding:0.55rem 0.3rem;text-align:center;font-size:0.8rem;font-weight:500;border:1px solid var(--gold4);cursor:pointer;transition:all 0.2s}
 .time-slot:hover:not(.unavail){background:var(--gold3);border-color:var(--gold)}
 .time-slot.selected{background:var(--gold);color:var(--black);font-weight:700;border-color:var(--gold)}
-.time-slot.unavail{color:var(--dim2);cursor:not-allowed;border-color:rgba(245,240,232,0.07);text-decoration:line-through}
+.time-slot.unavail{color:rgba(245,240,232,0.25);cursor:not-allowed;border-color:rgba(245,240,232,0.12);background:rgba(245,240,232,0.03);position:relative;overflow:hidden}
+.time-slot.unavail::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:rgba(231,76,60,0.5);background:rgba(231,76,60,0.05)}
 .waitlist-banner{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);padding:1.2rem;margin-bottom:1.5rem}
 .waitlist-banner h4{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--red);margin-bottom:0.4rem}
 .waitlist-banner p{font-size:0.85rem;color:var(--dim);line-height:1.6}
@@ -643,7 +644,14 @@ async function selDay(d,dt,el){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
       lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
-      availM.forEach(t=>{const e=document.createElement('div');e.className='time-slot';e.textContent=t;e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
+      getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{
+        const e=document.createElement('div');
+        const isAvail=availM.includes(t);
+        e.className='time-slot'+(isAvail?'':' unavail');
+        e.textContent=t;
+        if(isAvail)e.onclick=()=>selTime(e,t,'Michael');
+        grid.appendChild(e);
+      });
     }
     if(barbaraBlocked){
       const lbl2=document.createElement('div');
@@ -653,7 +661,14 @@ async function selDay(d,dt,el){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
-      availB.forEach(t=>{const e=document.createElement('div');e.className='time-slot';e.textContent=t;e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
+      getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{
+        const e=document.createElement('div');
+        const isAvail=availB.includes(t);
+        e.className='time-slot'+(isAvail?'':' unavail');
+        e.textContent=t;
+        if(isAvail)e.onclick=()=>selTime(e,t,'Barbara Sandra');
+        grid.appendChild(e);
+      });
     }
     document.getElementById('time-sec').style.display='block';
   } else {
@@ -673,9 +688,12 @@ async function selDay(d,dt,el){
     const avail = getAvailableSlots(dt, busy, requestedDur, blockedSlots);
     if(avail.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
     const grid=document.getElementById('time-grid');grid.innerHTML='';
-    avail.forEach(t=>{
-      const e=document.createElement('div');e.className='time-slot';e.textContent=t;
-      e.onclick=()=>selTime(e,t,S.barber);
+    getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{
+      const e=document.createElement('div');
+      const isAvail=avail.includes(t);
+      e.className='time-slot'+(isAvail?'':' unavail');
+      e.textContent=t;
+      if(isAvail)e.onclick=()=>selTime(e,t,S.barber);
       grid.appendChild(e);
     });
     document.getElementById('time-sec').style.display='block';
