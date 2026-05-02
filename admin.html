@@ -1802,7 +1802,7 @@ async function saveHorairesSalon() {
   const {error} = await sb.from('horaires_salon').upsert(rows);
   if(error) { showToast('Erreur sauvegarde: '+error.message,'error'); return; }
   horairesSalonData = rows;
-  showToast('Heures d'ouverture sauvegardées ✓','success');
+  showToast("Heures d'ouverture sauvegardées ✓", 'success');
 }
 
 // ── RENDER COLLAB ──
