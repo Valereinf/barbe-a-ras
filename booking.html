@@ -688,6 +688,9 @@ async function selDay(d,dt,el){
   const dateStr=dt.toISOString().split('T')[0];
   const requestedDur = getTotalDur() || 30;
 
+  // Toujours recharger depuis Supabase pour refléter les modifs de Barbara
+  _horairesSalon = null;
+  _horairesCollab = null;
   await ensureHoraires();
 
   // Vérifier que le salon est ouvert ce jour
