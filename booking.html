@@ -88,8 +88,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
 .time-slot.selected{background:var(--gold);color:var(--black);font-weight:700;border-color:var(--gold)}
 .time-slot.unavail{color:rgba(245,240,232,0.22);cursor:not-allowed;border-color:rgba(245,240,232,0.1);background:rgba(245,240,232,0.02);position:relative;overflow:hidden}
 .time-slot.unavail::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:rgba(231,76,60,0.45);background:rgba(231,76,60,0.04);pointer-events:none}
-.time-slot.pause-overflow{color:rgba(201,168,76,0.3);cursor:not-allowed;border-color:rgba(201,168,76,0.15);background:rgba(201,168,76,0.03);position:relative;overflow:hidden}
-.time-slot.pause-overflow::after{content:"↷";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:rgba(201,168,76,0.35);pointer-events:none}
 .pause-divider{grid-column:1/-1;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-left:3px solid var(--gold4);padding:0.35rem 0.8rem;font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin:2px 0}
 .waitlist-banner{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);padding:1.2rem;margin-bottom:1.5rem}
 .waitlist-banner h4{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--red);margin-bottom:0.4rem}
@@ -629,7 +627,7 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
   const pauseIntervals = [];
   if(range && range.pauses) {
     for(const p of range.pauses) {
-      pauseIntervals.push({start:toMins(p.debut), end:toMins(p.fin)});
+      pauseIntervals.push({start:toMins(p.debut), end:toMins(p.fin), isPause:true});
     }
   }
   const allBusy = [...busyIntervals, ...pauseIntervals];
@@ -639,7 +637,14 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
     const slotEnd = slotStart + requestedDur;
     if(slotEnd > dayEnd) return false;
     for(const b of allBusy) {
-      if(slotStart < b.end && slotEnd > b.start) return false;
+      // Réservations existantes : bloquer si overlap complet
+      if(b.isPause) {
+        // Pause : bloquer uniquement si le créneau COMMENCE pendant la pause
+        if(slotStart >= b.start && slotStart < b.end) return false;
+      } else {
+        // Réservation : overlap standard
+        if(slotStart < b.end && slotEnd > b.start) return false;
+      }
     }
     if(blockedSlots.includes(slot)) return false;
     return true;
@@ -799,23 +804,10 @@ function renderSlots(grid, allSlots, avail, barber, dt, requestedDur) {
     const e = document.createElement('div');
     const isAvail = avail.includes(t);
 
-    // Déterminer si le créneau est bloqué à cause d'un débordement sur une pause
-    const slotEnd = slotStart + requestedDur;
-    const overflowsPause = !isAvail && pauses.some(p => {
-      const ps = toMins(p.debut);
-      const pe = toMins(p.fin);
-      // Créneau disponible avant la pause mais service déborde dedans
-      return slotStart < ps && slotEnd > ps;
-    });
-
     if(isAvail) {
       e.className = 'time-slot';
       e.textContent = t;
       e.onclick = () => selTime(e, t, barber);
-    } else if(overflowsPause) {
-      e.className = 'time-slot pause-overflow';
-      e.textContent = t;
-      e.title = 'Ce créneau empiète sur une pause';
     } else {
       e.className = 'time-slot  unavail';
       e.textContent = t;
