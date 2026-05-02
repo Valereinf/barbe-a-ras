@@ -446,16 +446,16 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
       </div>
       <div class="field">
         <label>Heure</label>
-        <select id="edit-resa-heure">
-          <option>08:00</option><option>08:30</option>
-          <option>09:00</option><option>09:30</option>
-          <option>10:00</option><option>10:30</option>
-          <option>11:00</option><option>11:30</option>
-          <option>13:00</option><option>13:30</option>
-          <option>14:00</option><option>14:30</option>
-          <option>15:00</option><option>15:30</option>
-          <option>16:00</option><option>16:30</option>
-        </select>
+        <input type="time" id="edit-resa-heure" step="900">
+        <div style="font-size:0.72rem;color:var(--dim2);margin-top:0.3rem">Format 24h — ex: 10:15, 10:45</div>
+      </div>
+      <div style="margin-top:1.2rem;padding:1rem;background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.2)">
+        <div style="font-size:0.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:0.6rem">📱 Notification client</div>
+        <p style="font-size:0.82rem;color:var(--dim2);margin-bottom:0.8rem">Après la sauvegarde, voulez-vous notifier le client de cette modification ?</p>
+        <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;font-size:0.85rem;color:var(--dim)">
+          <input type="checkbox" id="edit-resa-notify" style="accent-color:var(--gold);width:16px;height:16px">
+          Envoyer une notification au client (SMS/courriel)
+        </label>
       </div>
     </div>
     <div class="modal-footer">
@@ -1359,13 +1359,47 @@ async function saveResaEdit() {
   const prix = document.getElementById('edit-resa-prix').value;
   const date = document.getElementById('edit-resa-date').value;
   const heure = document.getElementById('edit-resa-heure').value;
+  const notify = document.getElementById('edit-resa-notify').checked;
   if(!date||!heure){showToast('Date et heure requises','err');return;}
+
+  // Save to Supabase
   await sb.from('reservations').update({
     barbier, service, prix, date_rdv:date, heure_rdv:heure+':00', rappel_envoye:false
   }).eq('id',id);
-  showToast('Rendez-vous modifié ✅','ok');
+
+  // Send notification if checked
+  if(notify) {
+    const resa = allResa.find(r=>r.id===id);
+    const client = resa?.clients;
+    if(client) {
+      await fetch('/.netlify/functions/cancel-booking', {
+        method:'GET',
+        headers:{}
+      }).catch(()=>{});
+      // Notify via dedicated function
+      await notifyResaModif(id, client, date, heure, barbier, service);
+    }
+  }
+
+  showToast(notify ? 'RDV modifié + client notifié ✅' : 'RDV modifié ✅ (sans notification)','ok');
   closeModal('modal-edit-resa');
   loadAll();
+}
+
+async function notifyResaModif(id, client, newDate, newHeure, barbier, service) {
+  try {
+    await fetch('/.netlify/functions/notify-modif', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tel: client.telephone,
+        email: client.email,
+        prenom: client.prenom,
+        newDate, newHeure, barbier, service,
+        reservationId: id
+      })
+    });
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════════
