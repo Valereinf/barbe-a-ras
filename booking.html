@@ -86,8 +86,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
 .time-slot{padding:0.55rem 0.3rem;text-align:center;font-size:0.8rem;font-weight:500;border:1px solid var(--gold4);cursor:pointer;transition:all 0.2s}
 .time-slot:hover:not(.unavail){background:var(--gold3);border-color:var(--gold)}
 .time-slot.selected{background:var(--gold);color:var(--black);font-weight:700;border-color:var(--gold)}
-.time-slot.unavail{color:rgba(245,240,232,0.25);cursor:not-allowed;border-color:rgba(245,240,232,0.12);background:rgba(245,240,232,0.03);position:relative;overflow:hidden}
-.time-slot.unavail::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:rgba(231,76,60,0.5);background:rgba(231,76,60,0.05)}
+.time-slot.unavail{color:var(--dim2);cursor:not-allowed;border-color:rgba(245,240,232,0.07);text-decoration:line-through}
 .waitlist-banner{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);padding:1.2rem;margin-bottom:1.5rem}
 .waitlist-banner h4{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--red);margin-bottom:0.4rem}
 .waitlist-banner p{font-size:0.85rem;color:var(--dim);line-height:1.6}
@@ -280,7 +279,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
       </div>
       <div class="panel-body" style="border-top:1px solid var(--gold4)">
         <div class="btn-row">
-          <button class="btn-back" onclick="goStep(1)">← Retour</button>
+          <button class="btn-back" id="b2-back" onclick="S.isAddOn?goStep(5):goStep(1)">← Retour</button>
           <button class="btn-gold" id="b2" onclick="goStep(3)" disabled>Continuer →</button>
         </div>
       </div>
@@ -391,6 +390,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
         <p style="margin-top:1rem;font-size:0.82rem;color:var(--dim2)">Questions ? <a href="tel:4186122007" style="color:var(--gold);text-decoration:none;font-family:'Bebas Neue',sans-serif;letter-spacing:2px">418-612-2007</a></p>
         <div style="margin-top:2.5rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
           <a href="index.html" class="btn-gold" style="text-decoration:none;flex:none">← Retour au site</a>
+          <button class="btn-gold" style="background:transparent;color:var(--gold);border:2px solid var(--gold);flex:none" onclick="addAnotherService()">✂ Ajouter un service</button>
           <button class="btn-back" onclick="resetAll()">Nouveau rendez-vous</button>
         </div>
       </div>
@@ -644,14 +644,7 @@ async function selDay(d,dt,el){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
       lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
-      getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{
-        const e=document.createElement('div');
-        const isAvail=availM.includes(t);
-        e.className='time-slot'+(isAvail?'':' unavail');
-        e.textContent=t;
-        if(isAvail)e.onclick=()=>selTime(e,t,'Michael');
-        grid.appendChild(e);
-      });
+      availM.forEach(t=>{const e=document.createElement('div');e.className='time-slot';e.textContent=t;e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
     }
     if(barbaraBlocked){
       const lbl2=document.createElement('div');
@@ -661,14 +654,7 @@ async function selDay(d,dt,el){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
-      getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{
-        const e=document.createElement('div');
-        const isAvail=availB.includes(t);
-        e.className='time-slot'+(isAvail?'':' unavail');
-        e.textContent=t;
-        if(isAvail)e.onclick=()=>selTime(e,t,'Barbara Sandra');
-        grid.appendChild(e);
-      });
+      availB.forEach(t=>{const e=document.createElement('div');e.className='time-slot';e.textContent=t;e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
     }
     document.getElementById('time-sec').style.display='block';
   } else {
@@ -688,12 +674,9 @@ async function selDay(d,dt,el){
     const avail = getAvailableSlots(dt, busy, requestedDur, blockedSlots);
     if(avail.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
     const grid=document.getElementById('time-grid');grid.innerHTML='';
-    getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{
-      const e=document.createElement('div');
-      const isAvail=avail.includes(t);
-      e.className='time-slot'+(isAvail?'':' unavail');
-      e.textContent=t;
-      if(isAvail)e.onclick=()=>selTime(e,t,S.barber);
+    avail.forEach(t=>{
+      const e=document.createElement('div');e.className='time-slot';e.textContent=t;
+      e.onclick=()=>selTime(e,t,S.barber);
       grid.appendChild(e);
     });
     document.getElementById('time-sec').style.display='block';
@@ -725,10 +708,16 @@ function selTime(el,t,barberAssigned){
 
 function updSum(){
   document.getElementById('s-barber').textContent=S.assignedBarber||S.barber||'—';
-  document.getElementById('s-svc').textContent=getSvcNames()||'—';
+  if(S.isAddOn && S.existingResaServices){
+    document.getElementById('s-svc').textContent=S.existingResaServices+' + '+getSvcNames();
+    const cumul=((S.existingResaPrice||0)+getTotalPrice()).toFixed(2);
+    document.getElementById('s-price').textContent=cumul+'$ + taxes';
+  } else {
+    document.getElementById('s-svc').textContent=getSvcNames()||'—';
+    document.getElementById('s-price').textContent=getTotalPrice().toFixed(2)+'$ + taxes';
+  }
   const ds=S.date?S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' à '+S.time:'—';
   document.getElementById('s-dt').textContent=ds;
-  document.getElementById('s-price').textContent=getTotalPrice().toFixed(2)+'$ + taxes';
 }
 
 function chkForm(){
@@ -758,33 +747,65 @@ async function submitBooking(){
     await sb.from('clients').update({prenom,nom,email:email||null}).eq('id',clientId);
   }
   const dateStr=S.date.toISOString().split('T')[0];
-  const svcNames=getSvcNames();
-  const totalPrice=getTotalPrice().toFixed(2)+'$';
-  const {data:resa,error:re}=await sb.from('reservations').insert({
-    client_id:clientId,barbier:finalBarber,service:svcNames,prix:totalPrice,
-    date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note
-  }).select('id').single();
-  if(re){hideOverlay();showToast('Erreur lors de la réservation. Réessayez.','error');return;}
+  const newSvcNames=getSvcNames();
+  const newPrice=getTotalPrice();
+
+  let resaId, allSvcNames, allPrice, allPriceStr;
+
+  if(S.isAddOn && S.existingResaId){
+    // ── MODE AJOUT : PATCH sur la résa existante ──
+    allSvcNames = S.existingResaServices + ' + ' + newSvcNames;
+    allPrice = (S.existingResaPrice || 0) + newPrice;
+    allPriceStr = allPrice.toFixed(2)+'$';
+    const {error:pe} = await sb.from('reservations').update({
+      service: allSvcNames,
+      prix: allPriceStr,
+      date_rdv: dateStr,
+      heure_rdv: S.time,
+      rappel_envoye: false
+    }).eq('id', S.existingResaId);
+    if(pe){hideOverlay();showToast('Erreur lors de la mise à jour. Réessayez.','error');return;}
+    resaId = S.existingResaId;
+  } else {
+    // ── MODE NORMAL : INSERT ──
+    allSvcNames = newSvcNames;
+    allPrice = newPrice;
+    allPriceStr = allPrice.toFixed(2)+'$';
+    const {data:resa,error:re}=await sb.from('reservations').insert({
+      client_id:clientId,barbier:finalBarber,service:allSvcNames,prix:allPriceStr,
+      date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note
+    }).select('id').single();
+    if(re){hideOverlay();showToast('Erreur lors de la réservation. Réessayez.','error');return;}
+    resaId = resa.id;
+  }
+
+  // Une seule notification envoyée — qu'il s'agisse d'un INSERT ou d'un PATCH
   try{
     await fetch('/.netlify/functions/send-confirmation',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        reservationId:resa.id,prenom,nom,email,tel,barbier:finalBarber,
-        service:svcNames,prix:totalPrice,
+        reservationId:resaId,prenom,nom,email,tel,barbier:finalBarber,
+        service:allSvcNames,prix:allPriceStr,
         date:S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
         heure:S.time,note
       })
     });
   }catch(e){}
   hideOverlay();
+  // Mémoriser pour un éventuel service supplémentaire
+  S.savedClient = { prenom, nom, email, tel, note };
+  S.existingResaId = resaId;
+  S.existingResaServices = allSvcNames;
+  S.existingResaPrice = allPrice;
+  S.isAddOn = false;
   const ds=S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   document.getElementById('confirm-detail').innerHTML=`
     <div class="row"><span class="k">Barbier·ère</span><span class="v">${finalBarber}</span></div>
-    <div class="row"><span class="k">Services</span><span class="v">${svcNames}</span></div>
+    <div class="row"><span class="k">Services</span><span class="v">${allSvcNames}</span></div>
     <div class="row"><span class="k">Date</span><span class="v">${ds} à ${S.time}</span></div>
-    <div class="row"><span class="k">Prix</span><span class="v">${totalPrice} + taxes</span></div>
+    <div class="row"><span class="k">Total</span><span class="v" style="color:var(--gold);font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${allPriceStr} + taxes</span></div>
     ${note?`<div class="row"><span class="k">Note</span><span class="v">${note}</span></div>`:''}
-    <div class="row"><span class="k">Réf.</span><span class="v" style="font-size:0.75rem;color:var(--dim2)">#${resa.id.substring(0,8).toUpperCase()}</span></div>`;
+    <div class="row"><span class="k">Réf.</span><span class="v" style="font-size:0.75rem;color:var(--dim2)">#${resaId.substring(0,8).toUpperCase()}</span></div>`;
   document.getElementById('conf-tel').textContent=tel;
   if(email){document.getElementById('conf-email-msg').style.display='block';document.getElementById('conf-email-disp').textContent=email;}
   goStep(5);
@@ -818,8 +839,69 @@ async function submitWaitlist(){
 function showOverlay(msg){document.getElementById('overlay-msg').textContent=msg||'Traitement...';document.getElementById('overlay').classList.add('show');}
 function hideOverlay(){document.getElementById('overlay').classList.remove('show');}
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>t.className='toast',3500);}
+function addAnotherService(){
+  // Garder : barbier, savedClient
+  const savedBarber = S.barber;
+  const savedClient = S.savedClient || {};
+
+  // Réinitialiser services, date, heure — garder existingResaId pour le PATCH
+  const savedResaId = S.existingResaId;
+  const savedResaSvcs = S.existingResaServices;
+  const savedResaPrice = S.existingResaPrice;
+  S.services = [];
+  S.date = null;
+  S.time = null;
+  S.assignedBarber = null;
+  S.month = new Date().getMonth();
+  S.year = new Date().getFullYear();
+  S.bookingId = null;
+  S.isAddOn = true;
+  S.existingResaId = savedResaId;
+  S.existingResaServices = savedResaSvcs;
+  S.existingResaPrice = savedResaPrice;
+
+  // Décocher les services visuellement
+  document.querySelectorAll('.svc-item').forEach(c => c.classList.remove('selected'));
+  const cs = document.getElementById('cart-summary');
+  if(cs) cs.style.display = 'none';
+
+  // Réinitialiser date/heure
+  document.getElementById('b3').disabled = true;
+  document.getElementById('time-sec').style.display = 'none';
+  document.getElementById('waitlist-banner').style.display = 'none';
+
+  // Pré-remplir les coordonnées
+  if(savedClient.prenom) document.getElementById('f-prenom').value = savedClient.prenom;
+  if(savedClient.nom)    document.getElementById('f-nom').value    = savedClient.nom;
+  if(savedClient.tel)    document.getElementById('f-tel').value    = savedClient.tel;
+  if(savedClient.email)  document.getElementById('f-email').value  = savedClient.email;
+  if(savedClient.note)   document.getElementById('f-note').value   = savedClient.note;
+  // Re-cocher la politique
+  const p = document.getElementById('policy');
+  if(p) p.checked = true;
+
+  // Remettre les boutons dans leur état initial sauf b4 (coordonnées déjà remplies)
+  document.getElementById('b1').disabled = false;
+  document.getElementById('b2').disabled = true;
+  document.getElementById('blocked-msg').style.display = 'none';
+
+  // Repartir au step 2, barbier déjà sélectionné
+  S.barber = savedBarber;
+  S.savedClient = savedClient;
+
+  // Recocher visuellement la carte barbier
+  document.querySelectorAll('.barber-card').forEach(c => {
+    c.classList.remove('selected');
+    if(c.getAttribute('onclick')?.includes(savedBarber)) c.classList.add('selected');
+  });
+
+  goStep(2);
+  chkForm();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 function resetAll(){
-  S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null};
+  S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
   document.querySelectorAll('.barber-card,.svc-item').forEach(c=>c.classList.remove('selected'));
   ['f-prenom','f-nom','f-tel','f-email','f-note','wl-prenom','wl-nom','wl-tel','wl-email'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const p=document.getElementById('policy');if(p)p.checked=false;
