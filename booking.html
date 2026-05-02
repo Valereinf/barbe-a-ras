@@ -88,6 +88,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
 .time-slot.selected{background:var(--gold);color:var(--black);font-weight:700;border-color:var(--gold)}
 .time-slot.unavail{color:rgba(245,240,232,0.22);cursor:not-allowed;border-color:rgba(245,240,232,0.1);background:rgba(245,240,232,0.02);position:relative;overflow:hidden}
 .time-slot.unavail::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:rgba(231,76,60,0.45);background:rgba(231,76,60,0.04);pointer-events:none}
+.time-slot.pause-overflow{color:rgba(201,168,76,0.3);cursor:not-allowed;border-color:rgba(201,168,76,0.15);background:rgba(201,168,76,0.03);position:relative;overflow:hidden}
+.time-slot.pause-overflow::after{content:"↷";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:rgba(201,168,76,0.35);pointer-events:none}
+.pause-divider{grid-column:1/-1;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-left:3px solid var(--gold4);padding:0.35rem 0.8rem;font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin:2px 0}
 .waitlist-banner{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);padding:1.2rem;margin-bottom:1.5rem}
 .waitlist-banner h4{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--red);margin-bottom:0.4rem}
 .waitlist-banner p{font-size:0.85rem;color:var(--dim);line-height:1.6}
@@ -727,7 +730,7 @@ async function selDay(d,dt,el){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
       lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
-      const mRange=getBarberDayRange('Michael',dt);const mEnd=mRange?mRange.end:20*60;getAllSlots15(dt,'Michael').filter(t=>{return toMins(t)+requestedDur<=mEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=availM.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
+      const mRange=getBarberDayRange('Michael',dt);const mEnd=mRange?mRange.end:20*60;const mSlots=getAllSlots15(dt,'Michael').filter(t=>toMins(t)+requestedDur<=mEnd);renderSlots(grid,mSlots,availM,'Michael',dt,requestedDur);
     }
     if(barbaraBlocked){
       const lbl2=document.createElement('div');
@@ -737,7 +740,7 @@ async function selDay(d,dt,el){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
-      const bRange=getBarberDayRange('Barbara Sandra',dt);const bEnd=bRange?bRange.end:20*60;getAllSlots15(dt,'Barbara Sandra').filter(t=>{return toMins(t)+requestedDur<=bEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=availB.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
+      const bRange=getBarberDayRange('Barbara Sandra',dt);const bEnd=bRange?bRange.end:20*60;const bSlots=getAllSlots15(dt,'Barbara Sandra').filter(t=>toMins(t)+requestedDur<=bEnd);renderSlots(grid,bSlots,availB,'Barbara Sandra',dt,requestedDur);
     }
     document.getElementById('time-sec').style.display='block';
   } else {
@@ -759,9 +762,66 @@ async function selDay(d,dt,el){
     const grid=document.getElementById('time-grid');grid.innerHTML='';
     const barberRange=getBarberDayRange(S.barber,dt);
     const dayEndSpec=barberRange?barberRange.end:20*60;
-    getAllSlots15(dt,S.barber).filter(t=>{return toMins(t)+requestedDur<=dayEndSpec;}).forEach(t=>{const e=document.createElement('div');const isAvail=avail.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,S.barber);grid.appendChild(e);});
+    const specSlots=getAllSlots15(dt,S.barber).filter(t=>toMins(t)+requestedDur<=dayEndSpec);
+    renderSlots(grid,specSlots,avail,S.barber,dt,requestedDur);
     document.getElementById('time-sec').style.display='block';
   }
+}
+
+// Rendu des créneaux avec séparateurs visuels pour les pauses
+function renderSlots(grid, allSlots, avail, barber, dt, requestedDur) {
+  const range = getBarberDayRange(barber, dt);
+  const pauses = (range && range.pauses) || [];
+
+  // Construire la liste ordonnée : créneaux + bandeaux pause intercalés
+  // Pour chaque pause, on insère un bandeau juste avant le premier créneau de la pause
+  const pauseStarts = pauses.map(p => toMins(p.debut));
+  const pauseEnds   = pauses.map(p => toMins(p.fin));
+
+  let insertedPauses = new Set();
+
+  allSlots.forEach(t => {
+    const slotStart = toMins(t);
+
+    // Insérer un bandeau pause si ce créneau est le premier de la plage de pause
+    pauses.forEach((p, pi) => {
+      const ps = toMins(p.debut);
+      const pe = toMins(p.fin);
+      if(!insertedPauses.has(pi) && slotStart >= ps && slotStart < pe) {
+        insertedPauses.add(pi);
+        const div = document.createElement('div');
+        div.className = 'pause-divider';
+        div.textContent = `☕ Pause ${p.debut} – ${p.fin}`;
+        grid.appendChild(div);
+      }
+    });
+
+    const e = document.createElement('div');
+    const isAvail = avail.includes(t);
+
+    // Déterminer si le créneau est bloqué à cause d'un débordement sur une pause
+    const slotEnd = slotStart + requestedDur;
+    const overflowsPause = !isAvail && pauses.some(p => {
+      const ps = toMins(p.debut);
+      const pe = toMins(p.fin);
+      // Créneau disponible avant la pause mais service déborde dedans
+      return slotStart < ps && slotEnd > ps;
+    });
+
+    if(isAvail) {
+      e.className = 'time-slot';
+      e.textContent = t;
+      e.onclick = () => selTime(e, t, barber);
+    } else if(overflowsPause) {
+      e.className = 'time-slot pause-overflow';
+      e.textContent = t;
+      e.title = 'Ce créneau empiète sur une pause';
+    } else {
+      e.className = 'time-slot  unavail';
+      e.textContent = t;
+    }
+    grid.appendChild(e);
+  });
 }
 
 function isBarberBlocked(indis, barbier) {
