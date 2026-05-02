@@ -522,13 +522,66 @@ function toMins(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
 // Convert minutes since midnight to "HH:MM"
 function toTime(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
 
-// Generate all 15-min slots for a day
-function getAllSlots15(dt){
-  const isSat=dt.getDay()===6;
-  const start=isSat?8*60:9*60; // 08:00 or 09:00
-  const end=isSat?12*60:(dt.getDay()>=4?20*60:17*60); // Sat:12:00, Thu-Fri:20:00, else 17:00
+// Cache horaires chargés depuis Supabase
+let _horairesSalon = null;
+let _horairesCollab = null;
+
+async function ensureHoraires() {
+  if(_horairesSalon && _horairesCollab) return;
+  const [salonResp, collabResp] = await Promise.all([
+    sb.from('horaires_salon').select('*').order('dow'),
+    sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
+  ]);
+  _horairesSalon = salonResp.data && salonResp.data.length===7 ? salonResp.data : null;
+  if(collabResp.data && collabResp.data.length>=14) {
+    _horairesCollab = {};
+    for(const r of collabResp.data) {
+      if(!_horairesCollab[r.barbier]) _horairesCollab[r.barbier]=[];
+      _horairesCollab[r.barbier].push(r);
+    }
+  }
+}
+
+// Retourne {start, end} en minutes pour un barbier un jour donné (depuis Supabase ou défaut)
+function getBarberDayRange(barber, dt) {
+  const dow = dt.getDay();
+  if(_horairesCollab && _horairesCollab[barber]) {
+    const h = _horairesCollab[barber].find(r=>r.dow===dow);
+    if(h) return h.actif ? {start:toMins(h.debut),end:toMins(h.fin),pauses:h.pauses||[]} : null;
+  }
+  // Fallback hardcodé
+  const DEFAULTS = {
+    'Barbara Sandra':{0:null,1:{s:9*60,e:17*60,p:[[780,810]]},2:{s:10*60,e:17*60,p:[[840,870]]},3:{s:10*60,e:19*60+30,p:[[780,810],[1020,1050]]},4:{s:9*60,e:19*60+30,p:[[780,810],[1020,1050]]},5:{s:8*60+30,e:13*60,p:[]},6:null},
+    'Michael':{0:null,1:{s:9*60,e:17*60,p:[[780,810]]},2:{s:9*60,e:17*60,p:[[780,810]]},3:{s:9*60,e:20*60,p:[[780,810],[1020,1050]]},4:{s:9*60,e:20*60,p:[[780,810],[1020,1050]]},5:{s:8*60,e:12*60,p:[]},6:null}
+  };
+  const d = DEFAULTS[barber]?.[dow];
+  return d ? {start:d.s,end:d.e,pauses:d.p.map(pp=>({debut:toTime(pp[0]),fin:toTime(pp[1])}))} : null;
+}
+
+// Retourne {start,end} en minutes pour le salon un jour donné
+function getSalonDayRange(dt) {
+  const dow = dt.getDay();
+  if(_horairesSalon) {
+    const h = _horairesSalon.find(r=>r.dow===dow);
+    if(h) return h.ouvert ? {start:toMins(h.debut),end:toMins(h.fin)} : null;
+  }
+  // Fallback
+  const isSat=dow===6;
+  if(dow===0||dow===1) return null;
+  return {start:isSat?8*60:9*60, end:isSat?12*60:(dow>=4?20*60:17*60)};
+}
+
+// Generate all 15-min slots for a day (basé sur le salon ou un barbier)
+function getAllSlots15(dt, barber) {
+  let range;
+  if(barber) {
+    range = getBarberDayRange(barber, dt);
+  } else {
+    range = getSalonDayRange(dt);
+  }
+  if(!range) return [];
   const slots=[];
-  for(let m=start;m<end;m+=15) slots.push(toTime(m));
+  for(let m=range.start;m<range.end;m+=15) slots.push(toTime(m));
   return slots;
 }
 
@@ -557,28 +610,35 @@ const SVC_DUR = {
 };
 
 // Get available slots given busy intervals and requested duration
-function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[]) {
-  const allSlots = getAllSlots15(dt);
-  const isSat = dt.getDay()===6;
-  const dayEnd = isSat ? 12*60 : (dt.getDay()>=4 ? 20*60 : 17*60);
+function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], barber=null) {
+  const allSlots = getAllSlots15(dt, barber);
+  const range = barber ? getBarberDayRange(barber, dt) : getSalonDayRange(dt);
+  const dayEnd = range ? range.end : 20*60;
+
+  // Ajouter les pauses du barbier comme intervalles occupés
+  const pauseIntervals = [];
+  if(range && range.pauses) {
+    for(const p of range.pauses) {
+      pauseIntervals.push({start:toMins(p.debut), end:toMins(p.fin)});
+    }
+  }
+  const allBusy = [...busyIntervals, ...pauseIntervals];
 
   return allSlots.filter(slot => {
     const slotStart = toMins(slot);
     const slotEnd = slotStart + requestedDur;
-    // Must fit before end of day
     if(slotEnd > dayEnd) return false;
-    // Must not overlap any busy interval
-    for(const b of busyIntervals) {
+    for(const b of allBusy) {
       if(slotStart < b.end && slotEnd > b.start) return false;
     }
-    // Must not be in blocked slots (indisponibilites)
     if(blockedSlots.includes(slot)) return false;
     return true;
   });
 }
 
 
-function renderCal(){
+async function renderCal(){
+  await ensureHoraires();
   document.getElementById('cal-lbl').textContent=FR_M[S.month]+' '+S.year;
   const grid=document.getElementById('cal-grid');grid.innerHTML='';
   FR_D.forEach(d=>{const e=document.createElement('div');e.className='cal-day-name';e.textContent=d;grid.appendChild(e);});
@@ -590,12 +650,12 @@ function renderCal(){
     const e=document.createElement('div');
     const dt=new Date(S.year,S.month,d);const dow=dt.getDay();
     const isPast=dt<new Date(today.getFullYear(),today.getMonth(),today.getDate());
-    const isOpen=dow>=2&&dow<=6;
+    const salonOpen = getSalonDayRange(dt) !== null;
     let cls='cal-day';
-    if(isPast||!isOpen)cls+=' past';
+    if(isPast||!salonOpen)cls+=' past';
     if(dt.toDateString()===today.toDateString())cls+=' today';
     e.className=cls;e.textContent=d;
-    if(!isPast&&isOpen)e.onclick=()=>selDay(d,dt,e);
+    if(!isPast&&salonOpen)e.onclick=()=>selDay(d,dt,e);
     grid.appendChild(e);
   }
 }
@@ -613,6 +673,21 @@ async function selDay(d,dt,el){
   const dateStr=dt.toISOString().split('T')[0];
   const requestedDur = getTotalDur() || 30;
 
+  await ensureHoraires();
+
+  // Vérifier que le salon est ouvert ce jour
+  const salonRange = getSalonDayRange(dt);
+  if(!salonRange) {
+    hideOverlay();
+    document.getElementById('time-grid').innerHTML=`
+      <div style="grid-column:1/-1;padding:1.2rem;background:rgba(231,76,60,0.08);
+        border:1px solid rgba(231,76,60,0.3);text-align:center;color:var(--red);font-size:0.85rem">
+        🔴 Le salon est <strong>fermé</strong> ce jour-là.
+      </div>`;
+    document.getElementById('time-sec').style.display='block';
+    return;
+  }
+
   const [indiResp, rB, rM] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
     sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier','Barbara Sandra').eq('statut','confirmé'),
@@ -621,8 +696,8 @@ async function selDay(d,dt,el){
 
   hideOverlay();
   const indis = indiResp.data||[];
-  const barbaraBlocked = isBarberBlocked(indis,'Barbara Sandra');
-  const michaelBlocked = isBarberBlocked(indis,'Michael');
+  const barbaraBlocked = isBarberBlocked(indis,'Barbara Sandra') || !getBarberDayRange('Barbara Sandra',dt);
+  const michaelBlocked = isBarberBlocked(indis,'Michael') || !getBarberDayRange('Michael',dt);
   const blockedSlotsB = getBlockedSlotsFromIndi(indis,'Barbara Sandra',dt);
   const blockedSlotsM = getBlockedSlotsFromIndi(indis,'Michael',dt);
   const busyB = getBusyIntervals(rB.data||[], SVC_DUR);
@@ -631,8 +706,8 @@ async function selDay(d,dt,el){
   document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
 
   if(S.barber==='Sans préférence'){
-    const availM = michaelBlocked ? [] : getAvailableSlots(dt, busyM, requestedDur, blockedSlotsM);
-    const availB = barbaraBlocked ? [] : getAvailableSlots(dt, busyB, requestedDur, blockedSlotsB);
+    const availM = michaelBlocked ? [] : getAvailableSlots(dt, busyM, requestedDur, blockedSlotsM, 'Michael');
+    const availB = barbaraBlocked ? [] : getAvailableSlots(dt, busyB, requestedDur, blockedSlotsB, 'Barbara Sandra');
     if(availM.length===0 && availB.length===0){
       document.getElementById('waitlist-banner').style.display='block';return;
     }
@@ -645,7 +720,7 @@ async function selDay(d,dt,el){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
       lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
-      getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=availM.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
+      const mRange=getBarberDayRange('Michael',dt);const mEnd=mRange?mRange.end:20*60;getAllSlots15(dt,'Michael').filter(t=>{return toMins(t)+requestedDur<=mEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=availM.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
     }
     if(barbaraBlocked){
       const lbl2=document.createElement('div');
@@ -655,7 +730,7 @@ async function selDay(d,dt,el){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
-      getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=availB.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
+      const bRange=getBarberDayRange('Barbara Sandra',dt);const bEnd=bRange?bRange.end:20*60;getAllSlots15(dt,'Barbara Sandra').filter(t=>{return toMins(t)+requestedDur<=bEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=availB.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
     }
     document.getElementById('time-sec').style.display='block';
   } else {
@@ -672,10 +747,12 @@ async function selDay(d,dt,el){
         </div>`;
       document.getElementById('time-sec').style.display='block';return;
     }
-    const avail = getAvailableSlots(dt, busy, requestedDur, blockedSlots);
+    const avail = getAvailableSlots(dt, busy, requestedDur, blockedSlots, S.barber);
     if(avail.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
     const grid=document.getElementById('time-grid');grid.innerHTML='';
-    getAllSlots15(dt).filter(t=>{const e=toMins(t)+requestedDur;const isSat=dt.getDay()===6;const dayEnd=isSat?12*60:(dt.getDay()>=4?20*60:17*60);return e<=dayEnd;}).forEach(t=>{const e=document.createElement('div');const isAvail=avail.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,S.barber);grid.appendChild(e);});
+    const barberRange=getBarberDayRange(S.barber,dt);
+    const dayEndSpec=barberRange?barberRange.end:20*60;
+    getAllSlots15(dt,S.barber).filter(t=>{return toMins(t)+requestedDur<=dayEndSpec;}).forEach(t=>{const e=document.createElement('div');const isAvail=avail.includes(t);e.className='time-slot'+(isAvail?'':'  unavail');e.textContent=t;if(isAvail)e.onclick=()=>selTime(e,t,S.barber);grid.appendChild(e);});
     document.getElementById('time-sec').style.display='block';
   }
 }
