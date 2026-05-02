@@ -515,11 +515,66 @@ function getTotalPrice(){return S.services.reduce((a,s)=>a+s.price,0);}
 function getTotalDur(){return S.services.reduce((a,s)=>a+s.dur,0);}
 function getSvcNames(){return S.services.map(s=>s.name).join(' + ');}
 
-function getAllSlots(dt){
+// Convert "HH:MM" to minutes since midnight
+function toMins(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
+// Convert minutes since midnight to "HH:MM"
+function toTime(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+
+// Generate all 15-min slots for a day
+function getAllSlots15(dt){
   const isSat=dt.getDay()===6;
-  return isSat?['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']:
-    ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+  const start=isSat?8*60:9*60; // 08:00 or 09:00
+  const end=isSat?12*60:(dt.getDay()>=4?20*60:17*60); // Sat:12:00, Thu-Fri:20:00, else 17:00
+  const slots=[];
+  for(let m=start;m<end;m+=15) slots.push(toTime(m));
+  return slots;
 }
+
+// Get busy intervals for a barber from reservations
+// Returns array of {start, end} in minutes
+function getBusyIntervals(reservations, serviceDurMap) {
+  return reservations.map(r => {
+    const start = toMins(r.heure_rdv.substring(0,5));
+    const dur = serviceDurMap[r.service] || 30;
+    return { start, end: start + dur };
+  });
+}
+
+// Service duration map
+const SVC_DUR = {
+  'Coupe de cheveux adulte': 30,
+  'Coupe enfant (0-15 ans)': 30,
+  'Cheveux + barbe à la lame serviette chaude': 60,
+  'Coupe de cheveux long à court': 45,
+  'Coupe + barbe au clipper': 45,
+  'Coupe + shampoing': 30,
+  'Barbe à la lame + serviettes chaudes': 30,
+  'Cheveux + barbe lame + shampoing': 60,
+  'Coupe adulte hors heures': 30,
+  'Coupe + barbe lame hors heures': 60,
+};
+
+// Get available slots given busy intervals and requested duration
+function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[]) {
+  const allSlots = getAllSlots15(dt);
+  const isSat = dt.getDay()===6;
+  const dayEnd = isSat ? 12*60 : (dt.getDay()>=4 ? 20*60 : 17*60);
+
+  return allSlots.filter(slot => {
+    const slotStart = toMins(slot);
+    const slotEnd = slotStart + requestedDur;
+    // Must fit before end of day
+    if(slotEnd > dayEnd) return false;
+    // Must not overlap any busy interval
+    for(const b of busyIntervals) {
+      if(slotStart < b.end && slotEnd > b.start) return false;
+    }
+    // Must not be in blocked slots (indisponibilites)
+    if(blockedSlots.includes(slot)) return false;
+    return true;
+  });
+}
+
 
 function renderCal(){
   document.getElementById('cal-lbl').textContent=FR_M[S.month]+' '+S.year;
@@ -554,129 +609,94 @@ async function selDay(d,dt,el){
   document.getElementById('time-sec').style.display='none';
   showOverlay('Vérification des disponibilités...');
   const dateStr=dt.toISOString().split('T')[0];
+  const requestedDur = getTotalDur() || 30;
 
-  // Fetch reservations AND indisponibilites in parallel
-  const queries = [
-    sb.from('indisponibilites').select('*')
-      .lte('date_debut', dateStr).gte('date_fin', dateStr)
-  ];
+  const [indiResp, rB, rM] = await Promise.all([
+    sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
+    sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier','Barbara Sandra').eq('statut','confirmé'),
+    sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier','Michael').eq('statut','confirmé')
+  ]);
+
+  hideOverlay();
+  const indis = indiResp.data||[];
+  const barbaraBlocked = isBarberBlocked(indis,'Barbara Sandra');
+  const michaelBlocked = isBarberBlocked(indis,'Michael');
+  const blockedSlotsB = getBlockedSlotsFromIndi(indis,'Barbara Sandra',dt);
+  const blockedSlotsM = getBlockedSlotsFromIndi(indis,'Michael',dt);
+  const busyB = getBusyIntervals(rB.data||[], SVC_DUR);
+  const busyM = getBusyIntervals(rM.data||[], SVC_DUR);
+
+  document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
 
   if(S.barber==='Sans préférence'){
-    queries.push(
-      sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier','Michael').eq('statut','confirmé'),
-      sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier','Barbara Sandra').eq('statut','confirmé')
-    );
-    const [indiResp, rM, rB] = await Promise.all(queries);
-    hideOverlay();
-    const indis = indiResp.data || [];
-    const michaelBlocked = isBarberBlocked(indis, 'Michael', dateStr);
-    const barbaraBlocked = isBarberBlocked(indis, 'Barbara Sandra', dateStr);
-    const blockedSlotsM = getBlockedSlots(indis, 'Michael', dt);
-    const blockedSlotsB = getBlockedSlots(indis, 'Barbara Sandra', dt);
-    const bookedM = (rM.data||[]).map(r=>r.heure_rdv.substring(0,5));
-    const bookedB = (rB.data||[]).map(r=>r.heure_rdv.substring(0,5));
-    showTimesNoPreference(dt,
-      michaelBlocked ? 'all' : [...bookedM, ...blockedSlotsM],
-      barbaraBlocked ? 'all' : [...bookedB, ...blockedSlotsB]
-    );
+    const availM = michaelBlocked ? [] : getAvailableSlots(dt, busyM, requestedDur, blockedSlotsM);
+    const availB = barbaraBlocked ? [] : getAvailableSlots(dt, busyB, requestedDur, blockedSlotsB);
+    if(availM.length===0 && availB.length===0){
+      document.getElementById('waitlist-banner').style.display='block';return;
+    }
+    const grid=document.getElementById('time-grid');grid.innerHTML='';
+    if(michaelBlocked){
+      const lbl=document.createElement('div');
+      lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:0.5rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px';
+      lbl.textContent='🔴 Michael — indisponible ce jour';grid.appendChild(lbl);
+    } else if(availM.length>0){
+      const lbl=document.createElement('div');
+      lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
+      lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
+      availM.forEach(t=>{const e=document.createElement('div');e.className='time-slot';e.textContent=t;e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
+    }
+    if(barbaraBlocked){
+      const lbl2=document.createElement('div');
+      lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:1rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px;margin-top:0.5rem';
+      lbl2.textContent='🔴 Barbara Sandra — indisponible ce jour';grid.appendChild(lbl2);
+    } else if(availB.length>0){
+      const lbl2=document.createElement('div');
+      lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
+      lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
+      availB.forEach(t=>{const e=document.createElement('div');e.className='time-slot';e.textContent=t;e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
+    }
+    document.getElementById('time-sec').style.display='block';
   } else {
-    queries.push(
-      sb.from('reservations').select('heure_rdv').eq('date_rdv',dateStr).eq('barbier',S.barber).eq('statut','confirmé')
-    );
-    const [indiResp, resaResp] = await Promise.all(queries);
-    hideOverlay();
-    const indis = indiResp.data || [];
-    const barberBlocked = isBarberBlocked(indis, S.barber, dateStr);
-    if(barberBlocked) {
-      const indi = indis.find(i=>i.barbier===S.barber||i.barbier==='Tous');
-      document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+    const isBlocked = S.barber==='Barbara Sandra' ? barbaraBlocked : michaelBlocked;
+    const busy = S.barber==='Barbara Sandra' ? busyB : busyM;
+    const blockedSlots = S.barber==='Barbara Sandra' ? blockedSlotsB : blockedSlotsM;
+    if(isBlocked){
+      const indi=indis.find(i=>i.barbier===S.barber||i.barbier==='Tous');
       document.getElementById('time-grid').innerHTML=`
         <div style="grid-column:1/-1;padding:1.2rem;background:rgba(231,76,60,0.08);
           border:1px solid rgba(231,76,60,0.3);text-align:center;color:var(--red);font-size:0.85rem">
           🔴 <strong>${S.barber}</strong> est indisponible ce jour<br>
-          <span style="font-size:0.78rem;color:var(--dim2);margin-top:0.3rem;display:block">
-            ${indi?.raison||'Congé'}</span>
+          <span style="font-size:0.78rem;color:var(--dim2);margin-top:0.3rem;display:block">${indi?.raison||'Congé'}</span>
         </div>`;
-      document.getElementById('time-sec').style.display='block';
-      return;
+      document.getElementById('time-sec').style.display='block';return;
     }
-    const blockedSlots = getBlockedSlots(indis, S.barber, dt);
-    const bookedTimes = (resaResp.data||[]).map(r=>r.heure_rdv.substring(0,5));
-    showTimes(dt, [...bookedTimes, ...blockedSlots]);
+    const avail = getAvailableSlots(dt, busy, requestedDur, blockedSlots);
+    if(avail.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
+    const grid=document.getElementById('time-grid');grid.innerHTML='';
+    avail.forEach(t=>{
+      const e=document.createElement('div');e.className='time-slot';e.textContent=t;
+      e.onclick=()=>selTime(e,t,S.barber);
+      grid.appendChild(e);
+    });
+    document.getElementById('time-sec').style.display='block';
   }
 }
 
-// Check if a barber is fully blocked (journée complète)
-function isBarberBlocked(indis, barbier, dateStr) {
-  return indis.some(i =>
-    (i.barbier === barbier || i.barbier === 'Tous') &&
-    !i.heure_debut && !i.heure_fin
-  );
+function isBarberBlocked(indis, barbier) {
+  return indis.some(i=>(i.barbier===barbier||i.barbier==='Tous')&&!i.heure_debut&&!i.heure_fin);
 }
 
-// Get specific blocked time slots from indisponibilites
-function getBlockedSlots(indis, barbier, dt) {
-  const blocked = [];
-  const allSlots = getAllSlots(dt);
-  indis.forEach(indi => {
-    if((indi.barbier === barbier || indi.barbier === 'Tous') && indi.heure_debut && indi.heure_fin) {
-      const start = indi.heure_debut.substring(0,5);
-      const end = indi.heure_fin.substring(0,5);
-      allSlots.forEach(slot => {
-        if(slot >= start && slot < end) blocked.push(slot);
-      });
+function getBlockedSlotsFromIndi(indis, barbier, dt) {
+  const blocked=[];
+  const allSlots=getAllSlots15(dt);
+  indis.forEach(indi=>{
+    if((indi.barbier===barbier||indi.barbier==='Tous')&&indi.heure_debut&&indi.heure_fin){
+      const start=toMins(indi.heure_debut.substring(0,5));
+      const end=toMins(indi.heure_fin.substring(0,5));
+      allSlots.forEach(slot=>{if(toMins(slot)>=start&&toMins(slot)<end)blocked.push(slot);});
     }
   });
   return blocked;
-}
-
-function showTimes(dt,bookedTimes=[]){
-  const allSlots=getAllSlots(dt);
-  const available=allSlots.filter(t=>!bookedTimes.includes(t));
-  document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
-  if(available.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
-  const grid=document.getElementById('time-grid');grid.innerHTML='';
-  allSlots.forEach(t=>{
-    const e=document.createElement('div');const un=bookedTimes.includes(t);
-    e.className='time-slot'+(un?' unavail':'');e.textContent=t;
-    if(!un)e.onclick=()=>selTime(e,t,S.barber);
-    grid.appendChild(e);
-  });
-  document.getElementById('time-sec').style.display='block';
-}
-
-function showTimesNoPreference(dt,bookedMichael=[],bookedBarbara=[]){
-  const allSlots=getAllSlots(dt);
-  document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
-  const michaelAllBlocked = bookedMichael === 'all';
-  const barbaraAllBlocked = bookedBarbara === 'all';
-  const bM = michaelAllBlocked ? allSlots : bookedMichael;
-  const bB = barbaraAllBlocked ? allSlots : bookedBarbara;
-  const freeMichael = michaelAllBlocked ? [] : allSlots.filter(t=>!bM.includes(t));
-  const freeBarbara = barbaraAllBlocked ? [] : allSlots.filter(t=>!bB.includes(t));
-  if(freeMichael.length===0&&freeBarbara.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
-  const grid=document.getElementById('time-grid');grid.innerHTML='';
-  if(!michaelAllBlocked){
-    const lbl=document.createElement('div');
-    lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
-    lbl.textContent='✂ Michael — disponible';grid.appendChild(lbl);
-    allSlots.forEach(t=>{const e=document.createElement('div');const un=bM.includes(t);e.className='time-slot'+(un?' unavail':'');e.textContent=t;if(!un)e.onclick=()=>selTime(e,t,'Michael');grid.appendChild(e);});
-  } else {
-    const lbl=document.createElement('div');
-    lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:0.5rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px';
-    lbl.textContent='🔴 Michael — indisponible ce jour';grid.appendChild(lbl);
-  }
-  if(!barbaraAllBlocked){
-    const lbl2=document.createElement('div');
-    lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
-    lbl2.textContent='✂ Barbara Sandra — disponible';grid.appendChild(lbl2);
-    allSlots.forEach(t=>{const e=document.createElement('div');const un=bB.includes(t);e.className='time-slot'+(un?' unavail':'');e.textContent=t;if(!un)e.onclick=()=>selTime(e,t,'Barbara Sandra');grid.appendChild(e);});
-  } else {
-    const lbl2=document.createElement('div');
-    lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:1rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px;margin-top:0.5rem';
-    lbl2.textContent='🔴 Barbara Sandra — indisponible ce jour';grid.appendChild(lbl2);
-  }
-  document.getElementById('time-sec').style.display='block';
 }
 
 function selTime(el,t,barberAssigned){
