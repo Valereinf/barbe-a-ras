@@ -737,6 +737,22 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div style="background:rgba(201,168,76,0.06);border-left:3px solid var(--gold);padding:0.8rem;margin-bottom:1.2rem;font-size:0.85rem;color:var(--dim)">
         <strong style="color:var(--gold)" id="new-resa-slot-label"></strong>
       </div>
+      <!-- Champs date/heure/barbier — cachés si ouvert depuis calendrier, visibles si ouvert depuis fiche client -->
+      <div id="new-resa-dht-fields" style="display:none;margin-bottom:0.8rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem">
+          <div class="field" style="margin:0"><label>Date *</label>
+            <input type="date" id="new-resa-date-vis" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none">
+          </div>
+          <div class="field" style="margin:0"><label>Heure *</label>
+            <input type="text" id="new-resa-time-vis" placeholder="09:00" maxlength="5" oninput="fmtTime(this)" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none">
+          </div>
+        </div>
+        <div class="field" style="margin:0"><label>Barbier·ère *</label>
+          <select id="new-resa-barbier-vis" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none">
+            <!-- options chargées dynamiquement -->
+          </select>
+        </div>
+      </div>
       <input type="hidden" id="new-resa-date">
       <input type="hidden" id="new-resa-time">
       <input type="hidden" id="new-resa-barbier">
@@ -1265,6 +1281,10 @@ async function openClientModal(clientId) {
       onclick="closeModal('modal-client')">Fermer</button>
     <button class="btn-sm btn-info" onclick="openEditClientModal('${clientId}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveClientNote('${clientId}')">Sauvegarder note</button>
+    <button class="btn-sm" style="background:rgba(201,168,76,0.15);border:1px solid var(--gold);color:var(--gold);font-weight:700"
+      onclick="closeModal('modal-client');openNewResaFromClient('${clientId}','${client.prenom}','${client.nom}','${client.telephone||''}','${client.email||''}')">
+      ✂ Prendre un RDV
+    </button>
     ${client.est_bloque
       ?`<button class="btn-sm btn-success" onclick="unblockClient('${clientId}');closeModal('modal-client')">Débloquer</button>`
       :`<button class="btn-sm btn-danger" onclick="closeModal('modal-client');openBlockModal('${clientId}','${client.prenom} ${client.nom}')">Bloquer</button>`}
@@ -1642,7 +1662,7 @@ async function saveNewClient() {
   }
 
   const {error} = await sb.from('clients').insert({
-    prenom, nom, telephone:tel, email:email||null,
+    prenom, nom, telephone:tel, email:email||'',
     note_client:note||null, photo_url:photo||null
   });
   if(error) { showToast('Erreur : '+error.message,'error'); return; }
@@ -1811,8 +1831,43 @@ async function deleteIndi(id) {
 // ═══════════════════════════════════════════
 let newResaClientId = null;
 
+function openNewResaFromClient(clientId, prenom, nom, tel, email) {
+  // Ouvre le modal de création RDV avec le client déjà identifié
+  newResaClientId = clientId;
+  // Prendre la date d'aujourd'hui par défaut
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('new-resa-date').value = today;
+  document.getElementById('new-resa-time').value = '09:00';
+  // Pré-remplir le barbier avec le premier disponible
+  const firstBarbier = document.querySelector('#new-resa-barbier');
+  // new-resa-barbier est un input hidden — on le laisse vide pour que Barbara choisisse
+  document.getElementById('new-resa-barbier').value = '';
+  // Afficher les champs date/heure/barbier
+  document.getElementById('new-resa-dht-fields').style.display = 'block';
+  document.getElementById('new-resa-date-vis').value = today;
+  document.getElementById('new-resa-time-vis').value = '09:00';
+  // Peupler le select barbier
+  loadCollabs().then(collabs => {
+    const sel = document.getElementById('new-resa-barbier-vis');
+    sel.innerHTML = collabs.map(c=>`<option value="${c.nom}">${c.nom}</option>`).join('');
+  });
+  document.getElementById('new-resa-slot-label').innerHTML =
+    `<strong style="color:var(--gold)">${prenom} ${nom}</strong> — Choisissez date, heure et barbier ci-dessous`;
+  document.getElementById('new-resa-tel').value = tel;
+  document.getElementById('new-resa-prenom').value = prenom;
+  document.getElementById('new-resa-nom').value = nom;
+  document.getElementById('new-resa-email').value = email;
+  document.getElementById('new-resa-note').value = '';
+  const msg = document.getElementById('client-found-msg');
+  msg.textContent = `✅ Client : ${prenom} ${nom}`;
+  msg.style.color = 'var(--green)';
+  msg.style.display = 'block';
+  document.getElementById('modal-new-resa').classList.add('open');
+}
+
 function openNewResaModal(dateStr, time, barbier) {
   newResaClientId = null;
+  document.getElementById('new-resa-dht-fields').style.display = 'none';
   document.getElementById('new-resa-date').value = dateStr;
   document.getElementById('new-resa-time').value = time;
   document.getElementById('new-resa-barbier').value = barbier;
@@ -1855,9 +1910,12 @@ function updatePrix() {
 }
 
 async function saveNewResa() {
-  const date = document.getElementById('new-resa-date').value;
-  const time = document.getElementById('new-resa-time').value;
-  const barbier = document.getElementById('new-resa-barbier').value;
+  // Si ouvert depuis fiche client, lire les champs visibles
+  const dhtVisible = document.getElementById('new-resa-dht-fields').style.display !== 'none';
+  const date    = dhtVisible ? document.getElementById('new-resa-date-vis').value    : document.getElementById('new-resa-date').value;
+  const time    = dhtVisible ? document.getElementById('new-resa-time-vis').value    : document.getElementById('new-resa-time').value;
+  const barbier = dhtVisible ? document.getElementById('new-resa-barbier-vis').value : document.getElementById('new-resa-barbier').value;
+  if(!date||!time||!barbier){ showToast('Date, heure et barbier requis','error'); return; }
   const prenom = document.getElementById('new-resa-prenom').value.trim();
   const nom = document.getElementById('new-resa-nom').value.trim();
   const tel = document.getElementById('new-resa-tel').value.replace(/\D/g,'').slice(-10);
