@@ -1315,27 +1315,63 @@ async function marquerAbsent(resaId) {
     return;
   }
 
-  // Marquer absent directement — confirmation via toast
-  
-  try {
-    await sb.from('reservations').update({no_show: true}).eq('id', resaId);
+  // Ouvrir le modal de confirmation stylé
+  document.getElementById('modal-absent-resa-id').value = resaId;
+  document.getElementById('modal-absent').style.display = 'flex';
+}
 
-    // Mettre à jour client
-    const clientId = resa?.client_id || (await sb.from('reservations').select('client_id').eq('id',resaId).single()).data?.client_id;
+async function _execMarquerAbsent(resaId) {
+  const resa = allResa.find(r=>r.id===resaId);
+  try {
+    // 1. Marquer no_show = true
+    const {error} = await sb.from('reservations').update({no_show: true}).eq('id', resaId);
+    if(error) { showToast('Erreur : '+error.message,'error'); return; }
+
+    // 2. Récupérer client_id
+    const clientId = resa?.client_id ||
+      (await sb.from('reservations').select('client_id').eq('id',resaId).single()).data?.client_id;
+
     if(clientId) {
-      const {data:cl} = await sb.from('clients').select('nb_absences').eq('id',clientId).single();
+      // 3. Incrémenter nb_absences
+      const {data:cl} = await sb.from('clients').select('*').eq('id',clientId).single();
+      const nbAbs = (cl?.nb_absences||0) + 1;
       await sb.from('clients').update({
-        nb_absences: (cl?.nb_absences||0)+1,
+        nb_absences: nbAbs,
         derniere_absence: new Date().toISOString().split('T')[0]
-      }).eq('id',clientId);
+      }).eq('id', clientId);
+
+      // 4. Envoyer notification email/SMS
+      if(cl?.email) {
+        const {data:resaData} = await sb.from('reservations').select('*').eq('id',resaId).single();
+        const frais = (resaData?.service||'').toLowerCase().includes('barbe') ||
+                      (resaData?.service||'').toLowerCase().includes('lame')
+          ? '35,00 $ + taxes' : '19,50 $ + taxes';
+        try {
+          await fetch('/.netlify/functions/send-confirmation', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+              type: 'absence-penalty',
+              reservationId: resaId,
+              prenom: cl.prenom, nom: cl.nom,
+              email: cl.email, tel: cl.telephone,
+              barbier: resaData?.barbier||'',
+              service: resaData?.service||'',
+              prix: frais,
+              date: resaData?.date_rdv||'',
+              heure: resaData?.heure_rdv?.substring(0,5)||'',
+              nbAbsences: nbAbs
+            })
+          });
+        } catch(e) {}
+      }
     }
 
-    showToast('Absence enregistrée ✓','ok');
+    showToast('Absence enregistrée — notification envoyée ✓','ok');
     closeModal('modal-resa');
   } catch(e) {
     showToast('Erreur : '+e.message,'error');
   } finally {
-    
     await loadAll();
   }
 }
@@ -1344,63 +1380,7 @@ async function confirmerAbsent() {
   const resaId = document.getElementById('modal-absent-resa-id').value;
   document.getElementById('modal-absent').style.display = 'none';
   if(!resaId) { showToast('Erreur : ID manquant','error'); return; }
-
-  
-
-  try {
-    // 1. Mettre no_show = true — simple update sans select
-    const {error} = await sb.from('reservations')
-      .update({no_show: true})
-      .eq('id', resaId);
-
-    if(error) { showToast('Erreur Supabase : '+error.message,'error'); return; }
-
-    // 2. Récupérer le client_id séparément
-    const {data:resaInfo} = await sb.from('reservations')
-      .select('client_id').eq('id', resaId).single();
-    const clientId = resaInfo?.client_id;
-
-    if(clientId) {
-      // 2. Récupérer infos client
-      const {data:client} = await sb.from('clients').select('*').eq('id',clientId).single();
-      if(client) {
-        // 3. Incrémenter nb_absences
-        await sb.from('clients').update({
-          nb_absences: (client.nb_absences||0) + 1,
-          derniere_absence: new Date().toISOString().split('T')[0]
-        }).eq('id', clientId);
-
-        // 4. Envoyer notification
-        if(client.email) {
-          const {data:resa} = await sb.from('reservations').select('*').eq('id',resaId).single();
-          const frais = (resa?.service||'').toLowerCase().includes('barbe')||(resa?.service||'').toLowerCase().includes('lame')
-            ? '35,00 $ + taxes' : '19,50 $ + taxes';
-          try {
-            await fetch('/.netlify/functions/send-confirmation', {
-              method:'POST', headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({
-                type:'absence-penalty', reservationId:resaId,
-                prenom:client.prenom, nom:client.nom, email:client.email,
-                tel:client.telephone, barbier:resa?.barbier||'',
-                service:resa?.service||'', prix:frais,
-                date:resa?.date_rdv||'', heure:resa?.heure_rdv?.substring(0,5)||'',
-                nbAbsences:(client.nb_absences||0)+1
-              })
-            });
-          } catch(e) {}
-        }
-      }
-    }
-
-    showToast('Absence enregistrée ✓', 'ok');
-    closeModal('modal-resa');
-
-  } catch(e) {
-    showToast('Erreur inattendue : '+e.message,'error');
-  } finally {
-    
-    await loadAll(); // Toujours recharger, quoi qu'il arrive
-  }
+  await _execMarquerAbsent(resaId);
 }
 
 async function cancelResa(id) {
