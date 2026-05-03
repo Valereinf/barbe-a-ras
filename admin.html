@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
+<meta http-equiv="Content-Language" content="fr">
 <title>Admin — Barbe-À-Ras</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -255,7 +257,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 }
 </style>
 </head>
-<body>
+<body translate="no" class="notranslate">
 
 <div class="toast" id="toast"></div>
 
@@ -1331,8 +1333,6 @@ async function confirmerAbsent() {
       .eq('id', resaId)
       .select('id,no_show,client_id')
       .single();
-
-    alert('update result: error=' + (error?.message||'none') + ' | updData=' + JSON.stringify(updData));
 
     if(error) { showToast('Erreur Supabase : '+error.message,'error'); return; }
 
