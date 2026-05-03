@@ -587,6 +587,7 @@ function toTime(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%
 // Cache horaires chargés depuis Supabase (rechargé à chaque session de booking)
 let _horairesSalon = null;
 let _horairesCollab = null;
+let _horairesExceptions = {};
 
 // Fallback salon si Supabase vide/erreur
 const FALLBACK_SALON = [
@@ -601,9 +602,10 @@ const FALLBACK_SALON = [
 async function ensureHoraires() {
   if(_horairesSalon && _horairesCollab) return;
   try {
-    const [salonResp, collabResp] = await Promise.all([
+    const [salonResp, collabResp, excResp] = await Promise.all([
       sb.from('horaires_salon').select('*').order('dow'),
-      sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
+      sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow'),
+      sb.from('horaires_exceptions').select('*').eq('actif',true).order('date_debut')
     ]);
     console.log('[horaires] salon:', salonResp.data?.length, 'rows, error:', salonResp.error?.message);
     console.log('[horaires] collab:', collabResp.data?.length, 'rows, error:', collabResp.error?.message);
@@ -626,17 +628,35 @@ async function ensureHoraires() {
     } else {
       _horairesCollab = {};
     }
+    // Exceptions
+    _horairesExceptions = {};
+    for(const ex of excResp.data||[]) {
+      if(!_horairesExceptions[ex.barbier]) _horairesExceptions[ex.barbier] = [];
+      ex.pauses = typeof ex.pauses === 'string' ? JSON.parse(ex.pauses) : (ex.pauses||[]);
+      _horairesExceptions[ex.barbier].push(ex);
+    }
   } catch(e) {
-    // En cas d'erreur réseau, utiliser le fallback
     console.warn('Horaires Supabase inaccessibles, fallback utilisé');
     _horairesSalon = FALLBACK_SALON;
     _horairesCollab = {};
+    _horairesExceptions = {};
   }
 }
 
 // Retourne {start, end} en minutes pour un barbier un jour donné (depuis Supabase ou défaut)
 function getBarberDayRange(barber, dt) {
   const dow = dt.getDay();
+  const dateStr = dt.toISOString().split('T')[0];
+
+  // 1. Vérifier les exceptions de période en premier
+  if(_horairesExceptions && _horairesExceptions[barber]) {
+    const exc = _horairesExceptions[barber].find(ex =>
+      dateStr >= ex.date_debut && dateStr <= ex.date_fin
+    );
+    if(exc) return {start:toMins(exc.debut), end:toMins(exc.fin), pauses:exc.pauses||[], isException:true};
+  }
+
+  // 2. Horaire standard
   if(_horairesCollab && _horairesCollab[barber]) {
     const h = _horairesCollab[barber].find(r=>parseInt(r.dow)===dow);
     if(h) return h.actif ? {start:toMins(h.debut),end:toMins(h.fin),pauses:h.pauses||[]} : null;
@@ -776,6 +796,7 @@ async function selDay(d,dt,el){
   // Toujours recharger depuis Supabase pour refléter les modifs de Barbara
   _horairesSalon = null;
   _horairesCollab = null;
+  _horairesExceptions = {};
   await ensureHoraires();
 
   // Vérifier que le salon est ouvert ce jour
