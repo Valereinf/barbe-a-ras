@@ -391,9 +391,9 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         <table class="data-table" id="resa-table">
           <thead><tr>
             <th>Date</th><th>Heure</th><th>Client</th><th>Service</th>
-            <th>Barbier</th><th>Prix</th><th>Statut</th><th>Actions</th>
+            <th>Barbier</th><th>Prix</th><th>Statut</th><th style="text-align:center">Présence</th><th>Actions</th>
           </tr></thead>
-          <tbody id="resa-tbody"><tr><td colspan="8" class="empty">Chargement...</td></tr></tbody>
+          <tbody id="resa-tbody"><tr><td colspan="9" class="empty">Chargement...</td></tr></tbody>
         </table>
       </div>
 
@@ -1179,7 +1179,13 @@ function renderResa(data) {
       <td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${r.prix||'—'}</td>
       <td>
         <span class="status-badge status-${r.statut}">${r.statut}</span>
-        ${r.no_show?'<span class="badge-noshow">NO SHOW</span>':''}
+      </td>
+      <td style="text-align:center">
+        ${r.no_show
+          ? '<span style="color:var(--red);font-size:1.1rem" title="Absent">🚫</span>'
+          : (r.statut==='confirmé'
+              ? '<span style="color:var(--dim2);font-size:0.7rem;letter-spacing:1px">—</span>'
+              : '')}
       </td>
       <td style="white-space:nowrap">
         <button class="btn-sm btn-info" style="margin-right:4px" onclick="openResaModal('${r.id}')">Voir</button>
@@ -1408,7 +1414,7 @@ async function openResaModal(id) {
       <div class="info-row"><span class="k">Prix</span><span class="v">${resa.prix||'—'} + taxes</span></div>
       <div class="info-row"><span class="k">Statut</span><span class="v">
         <span class="status-badge status-${resa.statut}">${resa.statut}</span>
-        ${resa.no_show?'<span class="badge-noshow" style="margin-left:6px">🚫 NO SHOW</span>':''}
+        ${resa.no_show?'<span class="badge-noshow" style="margin-left:6px">🚫 Absent</span>':''}
       </span></div>
       <div class="info-row"><span class="k">Rappel envoyé</span><span class="v">${resa.rappel_envoye?'✅ Oui':'⏳ Non'}</span></div>
     </div>
@@ -1435,9 +1441,9 @@ async function openResaModal(id) {
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
     ${!resa.no_show
       ? `<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
-           onclick="marquerNoShow('${id}',true)">🚫 NO SHOW</button>`
+           onclick="marquerNoShow('${id}',true)">🚫 Absent</button>`
       : `<button class="btn-sm" style="background:rgba(39,174,96,0.15);border:1px solid var(--green);color:var(--green);font-weight:700"
-           onclick="marquerNoShow('${id}',false)">✅ ANNULER NO SHOW</button>`}
+           onclick="marquerNoShow('${id}',false)">✅ Annuler absent</button>`}
   `;
 
   document.getElementById('modal-resa').classList.add('open');
