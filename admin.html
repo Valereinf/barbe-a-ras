@@ -265,6 +265,9 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div class="nav-item" onclick="showTab('horaires')" id="nav-horaires">
         <span class="ico">🗓</span>Horaires
       </div>
+      <div class="nav-item" onclick="showTab('collaborateurs')" id="nav-collaborateurs">
+        <span class="ico">✂</span>Collaborateurs
+      </div>
       <div class="nav-item" onclick="showTab('heures-ouverture')" id="nav-heures-ouverture">
         <span class="ico">🕐</span>Heures salon
       </div>
@@ -289,38 +292,15 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         </div>
         <div style="font-size:0.72rem;color:var(--dim2);margin-bottom:1rem;letter-spacing:1px" id="cal-date-label"></div>
 
-        <!-- LÉGENDE -->
-        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
-            <div style="width:12px;height:12px;background:var(--gold);border-radius:2px"></div>Barbara Sandra
-          </div>
-          <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
-            <div style="width:12px;height:12px;background:var(--blue);border-radius:2px"></div>Michael
-          </div>
+        <!-- LÉGENDE dynamique -->
+        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap" id="cal-legend">
           <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
             <div style="width:12px;height:12px;background:rgba(39,174,96,0.3);border:1px solid var(--green);border-radius:2px"></div>Disponible
           </div>
         </div>
 
-        <!-- CALENDRIER CÔTE À CÔTE -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--gold4)">
-          <!-- BARBARA -->
-          <div style="background:var(--charcoal)">
-            <div style="padding:0.8rem 1rem;background:rgba(201,168,76,0.15);border-bottom:2px solid var(--gold);display:flex;justify-content:space-between;align-items:center">
-              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold)">✂ Barbara Sandra</span>
-              <span style="font-size:0.65rem;color:var(--dim2)" id="cal-barbara-count"></span>
-            </div>
-            <div id="cal-barbara"></div>
-          </div>
-          <!-- MICHAEL -->
-          <div style="background:var(--charcoal)">
-            <div style="padding:0.8rem 1rem;background:rgba(52,152,219,0.1);border-bottom:2px solid var(--blue);display:flex;justify-content:space-between;align-items:center">
-              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--blue)">✂ Michael</span>
-              <span style="font-size:0.65rem;color:var(--dim2)" id="cal-michael-count"></span>
-            </div>
-            <div id="cal-michael"></div>
-          </div>
-        </div>
+        <!-- CALENDRIER CÔTE À CÔTE dynamique -->
+        <div id="cal-cols-grid" style="display:grid;gap:1px;background:var(--gold4)"></div>
         <div style="margin-top:1rem;font-size:0.75rem;color:var(--dim2);padding:0.8rem;border:1px solid var(--gold4);background:rgba(201,168,76,0.03)">
           💡 Les créneaux <strong style="color:var(--green)">verts</strong> sont disponibles — proposez-les aux clients qui appellent par téléphone.
         </div>
@@ -428,6 +408,18 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         </table>
       </div>
 
+      <!-- TAB: COLLABORATEURS -->
+      <div class="tab" id="tab-collaborateurs">
+        <div class="sec-head">
+          <h2>Gestion des <span>collaborateurs</span></h2>
+          <button class="btn-sm btn-gold-sm" onclick="showAddCollabModal()">+ Ajouter</button>
+        </div>
+        <p style="font-size:0.82rem;color:var(--dim2);margin-bottom:1.5rem">
+          Gérez les barbiers affichés dans le booking et le calendrier. La photo et la couleur apparaissent dans le calendrier.
+        </p>
+        <div id="collabs-list"></div>
+      </div>
+
       <!-- TAB: HEURES D'OUVERTURE SALON -->
       <div class="tab" id="tab-heures-ouverture">
         <div class="sec-head">
@@ -466,6 +458,56 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 </div>
 
 
+<!-- MODAL: COLLABORATEUR -->
+<div id="modal-collab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:none;align-items:center;justify-content:center">
+  <div style="background:var(--charcoal);border:1px solid var(--gold4);max-width:420px;width:90%;padding:2rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+      <h3 id="modal-collab-title" style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px;color:var(--gold)">COLLABORATEUR</h3>
+      <button onclick="closeCollabModal()" style="background:none;border:none;color:var(--dim2);font-size:1.2rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div>
+        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Nom *</label>
+        <input id="collab-nom" type="text" placeholder="Prénom Nom" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.6rem 0.8rem;font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none;margin-top:0.3rem">
+      </div>
+      <div>
+        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Photo (URL)</label>
+        <input id="collab-photo" type="text" placeholder="https://... ou laisser vide" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.6rem 0.8rem;font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none;margin-top:0.3rem">
+        <div id="collab-photo-preview" style="margin-top:0.5rem;display:none">
+          <img id="collab-photo-img" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--gold4)">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Couleur dans le calendrier</label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem" id="collab-couleurs">
+          <div class="couleur-opt" data-c="#C9A84C" style="width:28px;height:28px;background:#C9A84C;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#4A90D9" style="width:28px;height:28px;background:#4A90D9;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#27ae60" style="width:28px;height:28px;background:#27ae60;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#e74c3c" style="width:28px;height:28px;background:#e74c3c;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#9b59b6" style="width:28px;height:28px;background:#9b59b6;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#e67e22" style="width:28px;height:28px;background:#e67e22;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#1abc9c" style="width:28px;height:28px;background:#1abc9c;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <div class="couleur-opt" data-c="#e91e8c" style="width:28px;height:28px;background:#e91e8c;cursor:pointer;border:2px solid transparent;border-radius:3px" onclick="selCouleur(this)"></div>
+          <input type="color" id="collab-couleur-custom" style="width:28px;height:28px;padding:0;border:1px solid var(--gold4);cursor:pointer;background:none" title="Couleur personnalisée" onchange="selCouleurCustom(this)">
+        </div>
+        <input type="hidden" id="collab-couleur-val" value="#C9A84C">
+      </div>
+      <div style="display:flex;align-items:center;gap:0.8rem">
+        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Actif</label>
+        <label class="horaire-toggle">
+          <input type="checkbox" id="collab-actif-toggle" checked>
+          <span class="horaire-toggle-slider"></span>
+        </label>
+      </div>
+      <input type="hidden" id="collab-edit-id" value="">
+      <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
+        <button class="btn-gold" style="flex:1" onclick="saveCollab()">💾 Sauvegarder</button>
+        <button class="btn-back" onclick="closeCollabModal()">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: MODIFIER RDV -->
 <div class="modal-bg" id="modal-edit-resa">
   <div class="modal">
@@ -478,8 +520,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div class="field">
         <label>Barbier·ère</label>
         <select id="edit-resa-barbier">
-          <option value="Barbara Sandra">Barbara Sandra</option>
-          <option value="Michael">Michael</option>
+          <!-- options chargées dynamiquement -->
         </select>
       </div>
       <div class="field">
@@ -561,8 +602,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div class="field">
         <label>Barbier·ère</label>
         <select id="indi-barbier">
-          <option value="Barbara Sandra">Barbara Sandra</option>
-          <option value="Michael">Michael</option>
+          <!-- options chargées dynamiquement -->
           <option value="Tous">Tous les deux (salon fermé)</option>
         </select>
       </div>
@@ -701,8 +741,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         <label>Barbier souhaité</label>
         <select id="edit-wl-barbier">
           <option value="Sans préférence">Sans préférence</option>
-          <option value="Barbara Sandra">Barbara Sandra</option>
-          <option value="Michael">Michael</option>
+          <!-- options chargées dynamiquement -->
         </select>
       </div>
       <div class="field">
@@ -831,7 +870,9 @@ function initApp() {
 }
 
 async function loadAll() {
+  await loadCollabs(true);
   await Promise.all([loadReservations(), loadClients(), loadWaitlist(), loadHorairesSalon(), loadHorairesCollab()]);
+  populateBarbierSelects();
   updateStats();
   loadTodayList();
 }
@@ -1284,7 +1325,9 @@ function showTab(name) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(name==='heures-ouverture') renderHorairesSalon();
-  if(name==='heures-collab') renderHorairesCollab();
+  if(name==='heures-collab') { loadHorairesCollab(); renderHorairesCollab(); }
+  if(name==='collaborateurs') loadCollabsTab();
+  if(name==='calendrier') { loadCalendrier(); return; }
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='calendrier') loadCalendrier();
   if(name==='horaires') loadIndisponibilites();
@@ -1294,95 +1337,84 @@ function showTab(name) {
 // CALENDRIER — vue côte à côte
 // ═══════════════════════════════════════════
 async function loadCalendrier(dateStr) {
+  const collabs = await loadCollabs();
+  if(!dateStr) dateStr = new Date().toISOString().split('T')[0];
   const picker = document.getElementById('cal-date-picker');
-  if(!dateStr) {
-    dateStr = new Date().toISOString().split('T')[0];
-    picker.value = dateStr;
-  } else {
-    picker.value = dateStr;
-  }
-
-  const dt = new Date(dateStr + 'T12:00:00');
+  if(picker) picker.value = dateStr;
+  const dt = new Date(dateStr+'T12:00:00');
   const dow = dt.getDay();
-  const label = document.getElementById('cal-date-label');
+  const isSat = dow===6;
+  const dateLabel = dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('cal-date-label').textContent = dateLabel.charAt(0).toUpperCase()+dateLabel.slice(1);
 
-  const isOpen = dow >= 2 && dow <= 6;
-  const isSat = dow === 6;
-  const dateFormatted = dt.toLocaleDateString('fr-CA', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-  label.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
-
-  if(!isOpen) {
-    document.getElementById('cal-barbara').innerHTML = '<div class="empty" style="padding:2rem">🔒 Salon fermé ce jour</div>';
-    document.getElementById('cal-michael').innerHTML = '<div class="empty" style="padding:2rem">🔒 Salon fermé ce jour</div>';
-    document.getElementById('cal-barbara-count').textContent = '';
-    document.getElementById('cal-michael-count').textContent = '';
-    return;
-  }
-
-  const allSlots = isSat
-    ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30']
-    : ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
-
-  const [rB, rM, indiResp] = await Promise.all([
-    sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
-      .eq('date_rdv', dateStr).eq('barbier', 'Barbara Sandra').eq('statut', 'confirmé'),
-    sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
-      .eq('date_rdv', dateStr).eq('barbier', 'Michael').eq('statut', 'confirmé'),
-    sb.from('indisponibilites').select('*')
-      .lte('date_debut', dateStr).gte('date_fin', dateStr)
-  ]);
-
-  const resaBarbara = rB.data || [];
-  const resaMichael = rM.data || [];
-  const indis = indiResp.data || [];
-
-  const barbaraBlocked = indis.some(i=>i.barbier==='Barbara Sandra'||i.barbier==='Tous');
-  const michaelBlocked = indis.some(i=>i.barbier==='Michael'||i.barbier==='Tous');
-
-  const bookedB = {};
-  resaBarbara.forEach(r => { bookedB[r.heure_rdv.substring(0,5)] = r; });
-  const bookedM = {};
-  resaMichael.forEach(r => { bookedM[r.heure_rdv.substring(0,5)] = r; });
-
-  const freeB = allSlots.filter(t => !bookedB[t]).length;
-  const freeM = allSlots.filter(t => !bookedM[t]).length;
-  document.getElementById('cal-barbara-count').textContent = barbaraBlocked ? '🔴 Indisponible' : `${resaBarbara.length} RDV · ${freeB} libres`;
-  document.getElementById('cal-michael-count').textContent = michaelBlocked ? '🔴 Indisponible' : `${resaMichael.length} RDV · ${freeM} libres`;
-
-  function renderCol(el, booked, barbier, isBlocked) {
-    if(isBlocked) {
-      const indi = indis.find(i=>i.barbier===barbier||i.barbier==='Tous');
-      el.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--red)">
-        🔴 <strong>Indisponible</strong><br>
-        <span style="font-size:0.78rem;color:var(--dim2);margin-top:0.3rem;display:block">${indi?.raison||'Congé'}</span>
+  // Légende dynamique
+  const legend = document.getElementById('cal-legend');
+  if(legend) {
+    legend.innerHTML = collabs.map(c=>`
+      <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
+        <div style="width:12px;height:12px;background:${c.couleur};border-radius:2px"></div>${c.nom}
+      </div>`).join('')+`<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--dim2)">
+        <div style="width:12px;height:12px;background:rgba(39,174,96,0.3);border:1px solid var(--green);border-radius:2px"></div>Disponible
       </div>`;
-      return;
-    }
-    el.innerHTML = allSlots.map(t => {
-      const r = booked[t];
-      if(r) {
-        const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
-        const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
-        return `<div class="cal-slot booked" onclick="openResaById('${r.id}')">
-          <span class="slot-time">${t}</span>
-          <div class="slot-info">
-            <div class="slot-name">${nom}</div>
-            <div class="slot-svc">${svc}</div>
-          </div>
-          <span class="slot-badge">RDV</span>
-        </div>`;
-      } else {
-        return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${barbier}')">
-          <span class="slot-time">${t}</span>
-          <div class="slot-info"><div class="slot-svc" style="color:var(--green)">Disponible — cliquer pour RDV</div></div>
-          <span class="slot-badge">+</span>
-        </div>`;
-      }
-    }).join('');
   }
 
-  renderCol(document.getElementById('cal-barbara'), bookedB, 'Barbara Sandra', barbaraBlocked);
-  renderCol(document.getElementById('cal-michael'), bookedM, 'Michael', michaelBlocked);
+  // Vérification salon ouvert
+  const salonCheck = isSat||dow===0||dow===1;
+  const calGrid = document.getElementById('cal-cols-grid');
+  if(!calGrid) return;
+
+  // Colonne par collaborateur
+  calGrid.style.gridTemplateColumns = collabs.map(()=>'1fr').join(' ');
+
+  // Charger les réservations et indisponibilités pour tous les collaborateurs
+  const [indiResp, ...resaResps] = await Promise.all([
+    sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
+    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
+      .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
+  ]);
+  const indis = indiResp.data||[];
+
+  // Générer les slots pour ce jour (ex: 30min steps)
+  const slotStep = 30;
+  const startH = isSat?8:9, endH = isSat?12:(dow>=4?20:17);
+  const allSlots=[];
+  for(let m=startH*60;m<endH*60;m+=slotStep) allSlots.push((Math.floor(m/60)+'').padStart(2,'0')+':'+(m%60+'').padStart(2,'0'));
+
+  calGrid.innerHTML = collabs.map((c,ci) => {
+    const booked = {};
+    (resaResps[ci]?.data||[]).forEach(r=>{ booked[r.heure_rdv.substring(0,5)]=r; });
+    const isBlocked = indis.some(i=>i.barbier===c.nom||i.barbier==='Tous');
+    const count = isBlocked ? '🔴 Indisponible' : `${Object.keys(booked).length} RDV · ${allSlots.filter(t=>!booked[t]).length} libres`;
+
+    const slotsHtml = isBlocked
+      ? `<div style="padding:2rem;text-align:center;color:var(--red)">🔴 <strong>Indisponible</strong><br>
+          <span style="font-size:0.78rem;color:var(--dim2)">${indis.find(i=>i.barbier===c.nom||i.barbier==='Tous')?.raison||'Congé'}</span></div>`
+      : allSlots.map(t => {
+          const r = booked[t];
+          if(r) {
+            const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
+            const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
+            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')">
+              <span class="slot-time">${t}</span>
+              <div class="slot-info"><div class="slot-name">${nom}</div><div class="slot-svc">${svc}</div></div>
+              <span class="slot-badge">RDV</span></div>`;
+          } else {
+            return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')">
+              <span class="slot-time">${t}</span>
+              <div class="slot-info"><div class="slot-svc" style="color:var(--green)">Disponible — cliquer pour RDV</div></div>
+              <span class="slot-badge">+</span></div>`;
+          }
+        }).join('');
+
+    return `<div style="background:var(--charcoal)">
+      <div style="padding:0.8rem 1rem;background:${c.couleur}22;border-bottom:2px solid ${c.couleur};display:flex;justify-content:space-between;align-items:center">
+        ${c.photo_url?`<img src="${c.photo_url}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;margin-right:0.5rem;border:1px solid ${c.couleur}">`:''} 
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:${c.couleur}">✂ ${c.nom}</span>
+        <span style="font-size:0.65rem;color:var(--dim2)">${count}</span>
+      </div>
+      <div>${slotsHtml}</div>
+    </div>`;
+  }).join('');
 }
 
 function calNavDay(delta) {
@@ -1682,6 +1714,142 @@ document.querySelectorAll('.modal-bg').forEach(bg=>{
 
 
 // ═══════════════════════════════════════════
+// COLLABORATEURS
+// ═══════════════════════════════════════════
+
+let _collabs = []; // cache global
+
+async function loadCollabs(force=false) {
+  if(!force && _collabs.length) return _collabs;
+  const {data} = await sb.from('collaborateurs').select('*').eq('actif',true).order('ordre').order('nom');
+  _collabs = data || [];
+  return _collabs;
+}
+
+async function loadCollabsTab() {
+  const all = await sb.from('collaborateurs').select('*').order('ordre').order('nom');
+  renderCollabsList(all.data||[]);
+}
+
+function renderCollabsList(list) {
+  const el = document.getElementById('collabs-list');
+  if(!el) return;
+  if(!list.length) { el.innerHTML='<p style="color:var(--dim2)">Aucun collaborateur.</p>'; return; }
+  el.innerHTML = list.map(c => `
+    <div style="display:flex;align-items:center;gap:1rem;padding:1rem;background:var(--charcoal);border:1px solid var(--gold4);margin-bottom:0.5rem">
+      <div style="width:48px;height:48px;border-radius:50%;overflow:hidden;background:var(--black);border:2px solid ${c.couleur};flex-shrink:0">
+        ${c.photo_url ? `<img src="${c.photo_url}" style="width:100%;height:100%;object-fit:cover">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:${c.couleur}">${c.nom.charAt(0)}</div>`}
+      </div>
+      <div style="flex:1">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:${c.couleur}">${c.nom}</div>
+        <div style="font-size:0.75rem;color:var(--dim2);margin-top:2px">${c.actif?'✅ Actif':'⛔ Inactif'}</div>
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn-sm" style="background:rgba(201,168,76,0.1);border:1px solid var(--gold4);color:var(--gold);padding:0.3rem 0.8rem;font-size:0.75rem;cursor:pointer" onclick="editCollab('${c.id}')">✏️ Modifier</button>
+        <button class="btn-sm" style="background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);color:var(--red);padding:0.3rem 0.8rem;font-size:0.75rem;cursor:pointer" onclick="toggleCollabActif('${c.id}',${c.actif})">${c.actif?'Désactiver':'Activer'}</button>
+      </div>
+    </div>`).join('');
+}
+
+function showAddCollabModal() {
+  document.getElementById('modal-collab-title').textContent = 'NOUVEAU COLLABORATEUR';
+  document.getElementById('collab-nom').value = '';
+  document.getElementById('collab-photo').value = '';
+  document.getElementById('collab-photo-preview').style.display = 'none';
+  document.getElementById('collab-edit-id').value = '';
+  document.getElementById('collab-actif-toggle').checked = true;
+  document.getElementById('collab-couleur-val').value = '#C9A84C';
+  document.querySelectorAll('.couleur-opt').forEach(o=>o.style.borderColor='transparent');
+  document.querySelector('.couleur-opt[data-c="#C9A84C"]').style.borderColor = '#fff';
+  document.getElementById('modal-collab').style.display = 'flex';
+}
+
+async function editCollab(id) {
+  const {data} = await sb.from('collaborateurs').select('*').eq('id',id).single();
+  if(!data) return;
+  document.getElementById('modal-collab-title').textContent = 'MODIFIER COLLABORATEUR';
+  document.getElementById('collab-nom').value = data.nom;
+  document.getElementById('collab-photo').value = data.photo_url||'';
+  document.getElementById('collab-edit-id').value = data.id;
+  document.getElementById('collab-actif-toggle').checked = data.actif;
+  document.getElementById('collab-couleur-val').value = data.couleur||'#C9A84C';
+  if(data.photo_url) {
+    document.getElementById('collab-photo-img').src = data.photo_url;
+    document.getElementById('collab-photo-preview').style.display = 'block';
+  } else {
+    document.getElementById('collab-photo-preview').style.display = 'none';
+  }
+  document.querySelectorAll('.couleur-opt').forEach(o => {
+    o.style.borderColor = o.dataset.c === data.couleur ? '#fff' : 'transparent';
+  });
+  document.getElementById('modal-collab').style.display = 'flex';
+}
+
+function selCouleur(el) {
+  document.querySelectorAll('.couleur-opt').forEach(o=>o.style.borderColor='transparent');
+  el.style.borderColor = '#fff';
+  document.getElementById('collab-couleur-val').value = el.dataset.c;
+}
+function selCouleurCustom(el) {
+  document.querySelectorAll('.couleur-opt').forEach(o=>o.style.borderColor='transparent');
+  document.getElementById('collab-couleur-val').value = el.value;
+}
+
+function closeCollabModal() {
+  document.getElementById('modal-collab').style.display = 'none';
+}
+
+async function saveCollab() {
+  const nom    = document.getElementById('collab-nom').value.trim();
+  const photo  = document.getElementById('collab-photo').value.trim();
+  const couleur= document.getElementById('collab-couleur-val').value;
+  const actif  = document.getElementById('collab-actif-toggle').checked;
+  const id     = document.getElementById('collab-edit-id').value;
+  if(!nom) { showToast('Le nom est obligatoire','error'); return; }
+
+  if(id) {
+    const {error} = await sb.from('collaborateurs').update({nom,photo_url:photo,couleur,actif}).eq('id',id);
+    if(error) { showToast('Erreur: '+error.message,'error'); return; }
+    showToast('Collaborateur mis à jour ✓','success');
+  } else {
+    // Vérifier doublon
+    const {data:existing} = await sb.from('collaborateurs').select('id').eq('nom',nom);
+    if(existing && existing.length) { showToast('Un collaborateur avec ce nom existe déjà','error'); return; }
+    const maxOrdre = await sb.from('collaborateurs').select('ordre').order('ordre',{ascending:false}).limit(1);
+    const ordre = ((maxOrdre.data||[])[0]?.ordre||0) + 1;
+    const {error} = await sb.from('collaborateurs').insert({nom,photo_url:photo,couleur,actif,ordre});
+    if(error) { showToast('Erreur: '+error.message,'error'); return; }
+    // Créer les horaires par défaut pour ce collaborateur
+    const defaultRows = [0,1,2,3,4,5,6].map(dow=>({barbier:nom,dow,actif:dow>=2&&dow<=6,debut:'09:00',fin:'17:00',pauses:[]}));
+    await sb.from('horaires_collaborateurs').upsert(defaultRows,{onConflict:'barbier,dow'});
+    showToast('Collaborateur ajouté ✓','success');
+  }
+
+  _collabs = []; // invalider cache
+  closeCollabModal();
+  loadCollabsTab();
+  // Recharger les selects barbier partout
+  populateBarbierSelects();
+}
+
+async function toggleCollabActif(id, actuel) {
+  await sb.from('collaborateurs').update({actif:!actuel}).eq('id',id);
+  _collabs = [];
+  loadCollabsTab();
+  populateBarbierSelects();
+}
+
+// Remplir dynamiquement tous les <select> de choix de barbier dans l'admin
+async function populateBarbierSelects() {
+  const collabs = await loadCollabs(true);
+  const opts = collabs.map(c=>`<option value="${c.nom}">${c.nom}</option>`).join('');
+  ['modal-barbier','create-rdv-barbier','wl-barbier-filter','modal-modif-barbier'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) { const val=el.value; el.innerHTML=opts; el.value=val||''; }
+  });
+}
+
+// ═══════════════════════════════════════════
 // HEURES D'OUVERTURE & COLLABORATEURS
 // ═══════════════════════════════════════════
 
@@ -1809,9 +1977,18 @@ async function saveHorairesSalon() {
 }
 
 // ── RENDER COLLAB ──
-function renderHorairesCollab() {
-  renderCollabGrid('Barbara Sandra', 'collab-barbara-grid');
-  renderCollabGrid('Michael', 'collab-michael-grid');
+async function renderHorairesCollab() {
+  const collabs = await loadCollabs();
+  const container = document.getElementById('collab-grids');
+  if(!container) return;
+  container.innerHTML = collabs.map(c => `
+    <div style="flex:1;min-width:300px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:${c.couleur};margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:2px solid ${c.couleur}44">${c.nom}</div>
+      <div id="collab-grid-${c.nom.replace(/ /g,'-')}"></div>
+    </div>`).join('');
+  for(const c of collabs) {
+    renderCollabGrid(c.nom, 'collab-grid-'+c.nom.replace(/ /g,'-'));
+  }
 }
 
 function renderCollabGrid(barbier, containerId) {
@@ -1888,10 +2065,16 @@ function collectCollabData(barbier) {
     const actif = document.getElementById('collab-actif-'+key+'-'+h.dow)?.checked||false;
     const debut = document.getElementById('collab-debut-'+key+'-'+h.dow)?.value||h.debut;
     const fin   = document.getElementById('collab-fin-'+key+'-'+h.dow)?.value||h.fin;
-    const pauses = (h.pauses||[]).map((p,pi) => ({
-      debut: document.getElementById('p-debut-'+key+'-'+h.dow+'-'+pi)?.value||p.debut,
-      fin:   document.getElementById('p-fin-'+key+'-'+h.dow+'-'+pi)?.value||p.fin,
-    }));
+    // Lire les pauses depuis le DOM — compter les éléments présents
+    const pauses = [];
+    let pi = 0;
+    while(true) {
+      const pdEl = document.getElementById('p-debut-'+key+'-'+h.dow+'-'+pi);
+      const pfEl = document.getElementById('p-fin-'+key+'-'+h.dow+'-'+pi);
+      if(!pdEl || !pfEl) break;
+      pauses.push({ debut: pdEl.value.trim(), fin: pfEl.value.trim() });
+      pi++;
+    }
     return { barbier, dow:h.dow, actif, debut, fin, pauses };
   });
 }
