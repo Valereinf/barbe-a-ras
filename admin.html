@@ -1165,7 +1165,7 @@ function loadTodayList() {
 // ═══════════════════════════════════════════
 function renderResa(data) {
   const tbody = document.getElementById('resa-tbody');
-  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="8" class="empty">Aucune réservation</td></tr>';return;}
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="9" class="empty">Aucune réservation</td></tr>';return;}
   tbody.innerHTML = data.map(r=>`
     <tr>
       <td>${r.date_rdv||'—'}</td>
@@ -1181,7 +1181,7 @@ function renderResa(data) {
         <span class="status-badge status-${r.statut}">${r.statut}</span>
       </td>
       <td style="text-align:center">
-        ${r.no_show
+        ${r.no_show===true
           ? '<span style="color:var(--red);font-size:1.1rem" title="Absent">🚫</span>'
           : (r.statut==='confirmé'
               ? '<span style="color:var(--dim2);font-size:0.7rem;letter-spacing:1px">—</span>'
