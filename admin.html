@@ -1088,7 +1088,7 @@ async function loadAll() {
 // ═══════════════════════════════════════════
 async function loadReservations() {
   const {data} = await sb.from('reservations')
-    .select('*, clients(id,prenom,nom,email,telephone,est_bloque)')
+    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences)')
     .order('date_rdv',{ascending:false})
     .order('heure_rdv',{ascending:true});
   allResa = data||[];
@@ -1284,19 +1284,18 @@ function searchClients(q) {
 // ═══════════════════════════════════════════
 // RESERVATION ACTIONS
 // ═══════════════════════════════════════════
-function marquerAbsent(resaId, clientId) {
+function marquerAbsent(resaId) {
   // Ouvrir le modal de confirmation custom
   document.getElementById('modal-absent-resa-id').value = resaId;
-  document.getElementById('modal-absent-client-id').value = clientId;
+  document.getElementById('modal-absent-client-id').value = ''; // sera récupéré depuis Supabase
   document.getElementById('modal-absent').style.display = 'flex';
 }
 
 async function confirmerAbsent() {
-  const resaId   = document.getElementById('modal-absent-resa-id').value;
-  const clientId = document.getElementById('modal-absent-client-id').value;
+  const resaId = document.getElementById('modal-absent-resa-id').value;
   document.getElementById('modal-absent').style.display = 'none';
 
-  if(!resaId || !clientId) { showToast('Erreur : IDs manquants','error'); return; }
+  if(!resaId) { showToast('Erreur : ID réservation manquant','error'); return; }
 
   showOverlay("Enregistrement de l'absence...");
 
@@ -1305,12 +1304,14 @@ async function confirmerAbsent() {
   if(ue) { hideOverlay(); showToast('Erreur mise à jour statut : '+ue.message,'error'); return; }
 
   // Vérifier que le statut a bien changé
-  const {data:check} = await sb.from('reservations').select('statut').eq('id',resaId).single();
+  const {data:check} = await sb.from('reservations').select('statut,client_id').eq('id',resaId).single();
   if(check?.statut !== 'absent') {
     hideOverlay();
     showToast("Erreur : statut non mis à jour. Vérifiez les permissions Supabase.",'error');
     return;
   }
+
+  const clientId = check.client_id;
 
   // 2. Récupérer les infos du client
   const {data:client} = await sb.from('clients').select('*').eq('id',clientId).single();
@@ -1416,7 +1417,7 @@ async function openResaModal(id) {
     <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
     ${resa.statut==='confirmé'?`<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
-      onclick="marquerAbsent('${id}','${resa.client_id}')">🚫 Marquer absent</button>`:''}
+      onclick="marquerAbsent('${id}')">🚫 Marquer absent</button>`:''}
     ${resa.statut==='absent'?`<span style="font-size:0.75rem;color:var(--red);padding:0.4rem 0.8rem;border:1px solid rgba(231,76,60,0.4);background:rgba(231,76,60,0.08)">🚫 Absence enregistrée</span>`:''}
   `;
 
