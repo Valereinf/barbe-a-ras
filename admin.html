@@ -1319,7 +1319,6 @@ async function marquerAbsent(resaId) {
 
 async function confirmerAbsent() {
   const resaId = document.getElementById('modal-absent-resa-id').value;
-  alert('resaId = [' + resaId + ']'); // DEBUG TEMPORAIRE
   document.getElementById('modal-absent').style.display = 'none';
   if(!resaId) { showToast('Erreur : ID manquant','error'); return; }
 
@@ -1332,6 +1331,8 @@ async function confirmerAbsent() {
       .eq('id', resaId)
       .select('id,no_show,client_id')
       .single();
+
+    alert('update result: error=' + (error?.message||'none') + ' | updData=' + JSON.stringify(updData));
 
     if(error) { showToast('Erreur Supabase : '+error.message,'error'); return; }
 
