@@ -1316,7 +1316,7 @@ async function marquerAbsent(resaId) {
   }
 
   // Marquer absent directement — confirmation via toast
-  showOverlay("Enregistrement de l'absence...");
+  
   try {
     await sb.from('reservations').update({no_show: true}).eq('id', resaId);
 
@@ -1335,7 +1335,7 @@ async function marquerAbsent(resaId) {
   } catch(e) {
     showToast('Erreur : '+e.message,'error');
   } finally {
-    hideOverlay();
+    
     await loadAll();
   }
 }
@@ -1345,7 +1345,7 @@ async function confirmerAbsent() {
   document.getElementById('modal-absent').style.display = 'none';
   if(!resaId) { showToast('Erreur : ID manquant','error'); return; }
 
-  showOverlay("Enregistrement de l'absence...");
+  
 
   try {
     // 1. Mettre no_show = true — simple update sans select
@@ -1398,7 +1398,7 @@ async function confirmerAbsent() {
   } catch(e) {
     showToast('Erreur inattendue : '+e.message,'error');
   } finally {
-    hideOverlay();
+    
     await loadAll(); // Toujours recharger, quoi qu'il arrive
   }
 }
