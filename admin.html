@@ -117,6 +117,11 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
 .horaire-field-group input[type=time]{background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.35rem 0.5rem;font-family:'Barlow',sans-serif;font-size:0.82rem;outline:none;width:110px}
 input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .horaire-field-group input[type=time]:focus{border-color:var(--gold)}
+.exception-item{background:rgba(231,76,60,0.06);border:1px solid rgba(231,76,60,0.25);padding:0.8rem 1rem;margin-bottom:0.5rem;position:relative}
+.exception-item .exc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
+.exception-item .exc-label{font-size:0.72rem;letter-spacing:1px;color:var(--red)}
+.exception-item .exc-dates{font-size:0.78rem;color:var(--white);font-weight:600}
+.exception-badge{font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);color:var(--red);padding:0.15rem 0.4rem}
 .pause-list{margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center}
 .pause-item{display:flex;align-items:center;gap:0.4rem;background:rgba(201,168,76,0.06);border:1px solid var(--gold4);padding:0.3rem 0.6rem;font-size:0.75rem}
 .pause-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:0.85rem;padding:0 0.2rem;line-height:1}
@@ -460,6 +465,53 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
   </div>
 </div>
 
+
+<!-- MODAL: EXCEPTION HORAIRE -->
+<div id="modal-exception" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--charcoal);border:1px solid rgba(231,76,60,0.4);max-width:460px;width:90%;padding:2rem;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--red)">⚠ EXCEPTION DE PÉRIODE</h3>
+      <button onclick="closeExceptionModal()" style="background:none;border:none;color:var(--dim2);font-size:1.2rem;cursor:pointer">✕</button>
+    </div>
+    <input type="hidden" id="exc-barbier">
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div>
+        <label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Barbier·ère</label>
+        <div id="exc-barbier-label" style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold);margin-top:0.3rem"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+        <div><label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;display:block;margin-bottom:0.3rem">Date début *</label>
+          <input type="date" id="exc-date-debut" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none"></div>
+        <div><label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;display:block;margin-bottom:0.3rem">Date fin *</label>
+          <input type="date" id="exc-date-fin" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+        <div><label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;display:block;margin-bottom:0.3rem">Heure début *</label>
+          <input type="text" id="exc-debut" value="09:00" maxlength="5" oninput="fmtTime(this)" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none;text-align:center"></div>
+        <div><label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;display:block;margin-bottom:0.3rem">Heure fin *</label>
+          <input type="text" id="exc-fin" value="17:00" maxlength="5" oninput="fmtTime(this)" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none;text-align:center"></div>
+      </div>
+      <div>
+        <label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;display:block;margin-bottom:0.3rem">Raison (optionnel)</label>
+        <input type="text" id="exc-raison" placeholder="Ex: horaires réduits été, congé partiel..." style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.5rem;font-size:0.85rem;outline:none">
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+          <label style="font-size:0.72rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Pauses pendant cette période</label>
+          <button onclick="addExcPause()" style="background:transparent;border:1px dashed var(--gold4);color:var(--dim2);padding:0.2rem 0.6rem;font-size:0.72rem;cursor:pointer">+ Pause</button>
+        </div>
+        <div id="exc-pauses-list"></div>
+      </div>
+      <p style="font-size:0.75rem;color:rgba(231,76,60,0.7);background:rgba(231,76,60,0.06);border-left:3px solid rgba(231,76,60,0.4);padding:0.6rem 0.8rem">
+        ⚠ Cet horaire remplacera l'horaire standard pour <strong>tous les jours</strong> de cette période.
+      </p>
+      <div style="display:flex;gap:0.8rem">
+        <button style="flex:1;background:var(--red);color:var(--white);border:none;padding:0.8rem;font-family:'Barlow',sans-serif;font-size:0.82rem;font-weight:700;letter-spacing:1px;cursor:pointer" onclick="saveException()">💾 Enregistrer l'exception</button>
+        <button style="background:transparent;border:1px solid var(--gold4);color:var(--dim2);padding:0.8rem 1.2rem;font-size:0.82rem;cursor:pointer" onclick="closeExceptionModal()">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: COLLABORATEUR -->
 <div id="modal-collab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:none;align-items:center;justify-content:center">
@@ -952,7 +1004,7 @@ function initApp() {
 
 async function loadAll() {
   await loadCollabs(true);
-  await Promise.all([loadReservations(), loadClients(), loadWaitlist(), loadHorairesSalon(), loadHorairesCollab()]);
+  await Promise.all([loadReservations(), loadClients(), loadWaitlist(), loadHorairesSalon(), loadHorairesCollab(), loadExceptions()]);
   populateBarbierSelects();
   updateStats();
   loadTodayList();
@@ -1424,7 +1476,7 @@ function showTab(name) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(name==='heures-ouverture') renderHorairesSalon();
-  if(name==='heures-collab') { loadHorairesCollab(); renderHorairesCollab(); }
+  if(name==='heures-collab') { loadHorairesCollab(); loadExceptions().then(()=>renderHorairesCollab()); }
   if(name==='collaborateurs') loadCollabsTab();
   if(name==='calendrier') { loadCalendrier(); return; }
   document.getElementById('nav-'+name).classList.add('active');
@@ -2325,6 +2377,35 @@ function renderCollabGrid(barbier, containerId) {
       </div>
     </div>`;
   }).join('');
+
+  // Section exceptions de période
+  const excKey = barbier.replace(/ /g,'-');
+  const excList = (_exceptionsData[barbier]||[]);
+  const excHtml = excList.map((ex,i) => `
+    <div class="exception-item">
+      <div class="exc-head">
+        <div>
+          <span class="exception-badge">Exception</span>
+          <span class="exc-dates" style="margin-left:0.5rem">${ex.date_debut} → ${ex.date_fin}</span>
+          ${ex.raison?`<span style="font-size:0.75rem;color:var(--dim2);margin-left:0.5rem">${ex.raison}</span>`:''}
+        </div>
+        <button onclick="deleteException('${ex.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.9rem" title="Supprimer">🗑</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.8rem;font-size:0.8rem">
+        <span style="color:var(--dim2)">Horaire :</span>
+        <span style="color:var(--white);font-weight:600">${ex.debut} – ${ex.fin}</span>
+        ${(ex.pauses||[]).length?`<span style="color:var(--dim2)">Pauses : ${ex.pauses.map(p=>p.debut+'–'+p.fin).join(', ')}</span>`:''}
+      </div>
+    </div>`).join('') || '<p style="font-size:0.8rem;color:var(--dim2);font-style:italic">Aucune exception &mdash; horaire standard.</p>';
+
+  grid.innerHTML += `
+    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid rgba(231,76,60,0.2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">
+        <span style="font-size:0.65rem;letter-spacing:3px;text-transform:uppercase;color:var(--red)">⚠ Exceptions de période</span>
+        <button onclick="openExceptionModal('${barbier}')" style="background:transparent;border:1px solid rgba(231,76,60,0.4);color:var(--red);padding:0.3rem 0.8rem;font-size:0.72rem;letter-spacing:1px;cursor:pointer">+ Ajouter</button>
+      </div>
+      <div id="exc-list-${excKey}">${excHtml}</div>
+    </div>`;
 }
 
 function toggleCollabDay(barbier, dow) {
@@ -2385,6 +2466,108 @@ async function saveHorairesCollab() {
   horairesCollabData['Michael'] = rows.filter(r=>r.barbier==='Michael');
   showToast('Horaires collaborateurs sauvegardés ✓','success');
 }
+// ═══════════════════════════════════════════
+// EXCEPTIONS D'HORAIRES
+// ═══════════════════════════════════════════
+let _exceptionsData = {}; // {barbier: [...exceptions]}
+let _excPauses = []; // pauses temporaires du modal
+
+async function loadExceptions() {
+  const {data} = await sb.from('horaires_exceptions').select('*').eq('actif',true).order('date_debut');
+  _exceptionsData = {};
+  for(const ex of data||[]) {
+    if(!_exceptionsData[ex.barbier]) _exceptionsData[ex.barbier] = [];
+    ex.pauses = typeof ex.pauses === 'string' ? JSON.parse(ex.pauses) : (ex.pauses||[]);
+    _exceptionsData[ex.barbier].push(ex);
+  }
+}
+
+function openExceptionModal(barbier) {
+  document.getElementById('exc-barbier').value = barbier;
+  document.getElementById('exc-barbier-label').textContent = barbier;
+  document.getElementById('exc-date-debut').value = '';
+  document.getElementById('exc-date-fin').value = '';
+  document.getElementById('exc-debut').value = '09:00';
+  document.getElementById('exc-fin').value = '17:00';
+  document.getElementById('exc-raison').value = '';
+  _excPauses = [];
+  renderExcPauses();
+  document.getElementById('modal-exception').style.display = 'flex';
+}
+
+function closeExceptionModal() {
+  document.getElementById('modal-exception').style.display = 'none';
+}
+
+function addExcPause() {
+  _excPauses.push({debut:'13:00',fin:'13:30'});
+  renderExcPauses();
+}
+
+function renderExcPauses() {
+  const list = document.getElementById('exc-pauses-list');
+  if(!list) return;
+  list.innerHTML = _excPauses.map((p,i) => `
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
+      <input type="text" value="${p.debut}" id="exc-p-debut-${i}" maxlength="5" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.3rem 0.5rem;font-size:0.8rem;width:70px;text-align:center">
+      <span style="color:var(--dim2)">–</span>
+      <input type="text" value="${p.fin}" id="exc-p-fin-${i}" maxlength="5" oninput="fmtTime(this)" style="background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.3rem 0.5rem;font-size:0.8rem;width:70px;text-align:center">
+      <button onclick="removeExcPause(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.9rem">✕</button>
+    </div>`).join('') || '<p style="font-size:0.78rem;color:var(--dim2)">Aucune pause</p>';
+}
+
+function removeExcPause(i) {
+  _excPauses.splice(i,1);
+  renderExcPauses();
+}
+
+async function saveException() {
+  const barbier    = document.getElementById('exc-barbier').value;
+  const dateDebut  = document.getElementById('exc-date-debut').value;
+  const dateFin    = document.getElementById('exc-date-fin').value;
+  const debut      = document.getElementById('exc-debut').value.trim();
+  const fin        = document.getElementById('exc-fin').value.trim();
+  const raison     = document.getElementById('exc-raison').value.trim();
+
+  if(!dateDebut||!dateFin) { showToast('Dates requises','error'); return; }
+  if(dateFin < dateDebut)  { showToast('La date de fin doit être après le début','error'); return; }
+
+  // Collecter les pauses du modal
+  const pauses = _excPauses.map((p,i) => ({
+    debut: document.getElementById('exc-p-debut-'+i)?.value||p.debut,
+    fin:   document.getElementById('exc-p-fin-'+i)?.value||p.fin
+  }));
+
+  // Validation
+  const errMsg = validateHoraires([{barbier,dow:0,actif:true,debut,fin,pauses}]);
+  if(errMsg) { showToast('⚠ '+errMsg,'error'); return; }
+
+  const {error} = await sb.from('horaires_exceptions').insert({
+    barbier, date_debut:dateDebut, date_fin:dateFin,
+    debut, fin, pauses, raison, actif:true
+  });
+  if(error) { showToast('Erreur : '+error.message,'error'); return; }
+
+  showToast('Exception enregistrée ✓','success');
+  closeExceptionModal();
+  await loadExceptions();
+  // Re-render la grille du barbier concerné
+  const containerId = 'collab-grid-'+barbier.replace(/ /g,'-');
+  renderCollabGrid(barbier, containerId);
+}
+
+async function deleteException(id) {
+  if(!confirm('Supprimer cette exception ?')) return;
+  await sb.from('horaires_exceptions').update({actif:false}).eq('id',id);
+  await loadExceptions();
+  // Re-render toutes les grilles
+  const collabs = await loadCollabs();
+  for(const c of collabs) {
+    renderCollabGrid(c.nom, 'collab-grid-'+c.nom.replace(/ /g,'-'));
+  }
+  showToast('Exception supprimée','ok');
+}
+
 // Auto-format HH:MM pendant la saisie
 function fmtTime(el) {
   let v = el.value.replace(/[^0-9]/g,'');
