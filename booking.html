@@ -473,7 +473,7 @@ function goStep(n){
     const el=document.getElementById(id);
     if(el)el.className='step'+(i+1<n?' done':i+1===n?' active':'');
   });
-  if(n===3){_horairesSalon=null;_horairesCollab=null;renderCal();}
+  if(n===3) renderCal();
   if(n===4)updSum();
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -541,8 +541,8 @@ function toTime(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%
 let _horairesSalon = null;
 let _horairesCollab = null;
 
-async function ensureHoraires(forceReload=false) {
-  if(!forceReload && _horairesSalon && _horairesCollab) return;
+async function ensureHoraires() {
+  if(_horairesSalon && _horairesCollab) return;
   const [salonResp, collabResp] = await Promise.all([
     sb.from('horaires_salon').select('*').order('dow'),
     sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
@@ -667,7 +667,7 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
 
 
 async function renderCal(){
-  await ensureHoraires(!_horairesSalon);
+  await ensureHoraires();
   document.getElementById('cal-lbl').textContent=FR_M[S.month]+' '+S.year;
   const grid=document.getElementById('cal-grid');grid.innerHTML='';
   FR_D.forEach(d=>{const e=document.createElement('div');e.className='cal-day-name';e.textContent=d;grid.appendChild(e);});
