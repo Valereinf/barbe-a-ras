@@ -6,6 +6,95 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
   const data = JSON.parse(event.body);
+
+  // ── CAS SPÉCIAL : notification d'absence / pénalité ──
+  if (data.type === 'absence-penalty') {
+    const { prenom, nom, email, tel, barbier, service, prix, date, heure, nbAbsences } = data;
+
+    const penaltyHtml = `
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><style>
+body{font-family:Arial,sans-serif;background:#f5f0e8;margin:0;padding:20px}
+.wrap{max-width:600px;margin:0 auto;background:#080808;color:#f5f0e8;border-top:4px solid #e74c3c}
+.head{background:#e74c3c;padding:25px 30px;text-align:center}
+.head h1{font-family:Georgia,serif;color:#fff;margin:0;font-size:24px;letter-spacing:3px}
+.body{padding:30px}
+.alert-box{border:2px solid rgba(231,76,60,0.5);background:rgba(231,76,60,0.08);padding:20px;margin:20px 0}
+.detail-table{width:100%;border-collapse:collapse;font-size:14px}
+.detail-table tr{border-bottom:1px solid rgba(201,168,76,0.1)}
+.detail-table td{padding:8px 4px;vertical-align:top}
+.detail-table td.lbl{color:rgba(245,240,232,0.5);width:120px}
+.detail-table td.val{color:#f5f0e8;font-weight:600;padding-left:16px}
+.penalty-box{background:rgba(231,76,60,0.1);border-left:4px solid #e74c3c;padding:15px;margin:20px 0}
+</style></head><body>
+<div class="wrap">
+  <div class="head"><h1>⚠ ABSENCE NON HONORÉE</h1></div>
+  <div class="body">
+    <p>Bonjour <strong>${prenom}</strong>,</p>
+    <p>Nous avons constaté que vous n'avez pas honoré votre rendez-vous chez <strong style="color:#C9A84C">Barbe-À-Ras</strong> :</p>
+    <div class="alert-box">
+      <table class="detail-table">
+        <tr><td class="lbl">Date</td><td class="val">${date}</td></tr>
+        <tr><td class="lbl">Heure</td><td class="val">${heure}</td></tr>
+        <tr><td class="lbl">Service</td><td class="val">${service}</td></tr>
+        <tr><td class="lbl">Barbier·ère</td><td class="val">${barbier}</td></tr>
+      </table>
+    </div>
+    <div class="penalty-box">
+      <p style="color:#e74c3c;font-weight:700;font-size:15px;margin:0 0 10px">💸 Frais de non-présentation applicables : <strong>${prix}</strong></p>
+      <p style="font-size:13px;color:rgba(245,240,232,0.7);margin:0">
+        Conformément à la politique du salon, ces frais seront exigibles lors de votre prochain rendez-vous.
+      </p>
+    </div>
+    ${nbAbsences > 1 ? `<p style="font-size:13px;color:rgba(231,76,60,0.8)">⚠ Ceci est votre <strong>${nbAbsences}e absence</strong>. Des absences répétées peuvent entraîner une suspension de votre compte.</p>` : ''}
+    <p style="font-size:13px;color:rgba(245,240,232,0.6)">
+      Pour toute question, contactez-nous au <a href="tel:4186122007" style="color:#C9A84C;text-decoration:none">(418) 612-2007</a>
+    </p>
+    <p style="margin-top:20px;font-size:12px;color:rgba(245,240,232,0.3)">
+      Barbe-À-Ras · 749 Rue d'Alma, Local 101, Chicoutimi, QC
+    </p>
+  </div>
+</div>
+</body></html>`;
+
+    if (email && RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+          to: [email],
+          subject: `⚠ Absence non honorée — Frais de ${prix} applicables | Barbe-À-Ras`,
+          html: penaltyHtml
+        })
+      });
+    }
+
+    // SMS pénalité
+    const TWILIO_SID = process.env.TWILIO_SID;
+    const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
+    const TWILIO_PHONE = process.env.TWILIO_PHONE;
+    if (tel && TWILIO_SID && TWILIO_TOKEN) {
+      const telClean = tel.replace(/\D/g,'').slice(-10);
+      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          From: TWILIO_PHONE.replace(/\s/g,''),
+          To: '+1' + telClean,
+          Body: `Bonjour ${prenom}, vous n'avez pas honoré votre RDV du ${date} chez Barbe-À-Ras. Des frais de ${prix} s'appliquent à votre prochain RDV. Info: (418) 612-2007`
+        }).toString()
+      }).catch(()=>{});
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ ok: true, type: 'penalty-sent' }) };
+  }
+
+  // ── CAS NORMAL : confirmation de réservation ──
+
+  const data = JSON.parse(event.body);
   const { reservationId, prenom, nom, email, tel, barbier, service, prix, date, heure, note } = data;
 
   // Generate cancellation token (simple but unique)
