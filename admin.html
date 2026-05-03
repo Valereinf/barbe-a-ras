@@ -86,6 +86,8 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
 .status-confirmé{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
 .status-annulé{background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3)}
 .status-absent{background:rgba(180,0,0,0.2);color:#ff6b6b;border:1px solid rgba(180,0,0,0.5);font-weight:700}
+.badge-noshow{display:inline-block;background:rgba(180,0,0,0.2);color:#ff6b6b;border:1px solid rgba(180,0,0,0.5);
+  padding:0.1rem 0.45rem;font-size:0.62rem;letter-spacing:1px;font-weight:700;vertical-align:middle;margin-left:4px}
 .status-en_attente{background:rgba(52,152,219,0.1);color:var(--blue);border:1px solid rgba(52,152,219,0.3)}
 .status-notifié{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
 .blocked-row td{opacity:0.5}
@@ -382,7 +384,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
           <button class="filter-btn active" onclick="filterResa('all',this)">Toutes</button>
           <button class="filter-btn" onclick="filterResa('confirmé',this)">Confirmées</button>
           <button class="filter-btn" onclick="filterResa('annulé',this)">Annulées</button>
-          <button class="filter-btn" onclick="filterResa('absent',this)" style="color:#ff6b6b;border-color:rgba(180,0,0,0.4)">🚫 Absents</button>
+          <button class="filter-btn" onclick="filterResaNoShow(this)" id="filter-noshow-btn" style="color:#ff6b6b;border-color:rgba(180,0,0,0.4)">🚫 No Show</button>
           <input type="date" id="filter-date" onchange="filterByDate(this.value)">
           <input class="search-input" type="text" placeholder="Chercher nom / service..." oninput="searchResa(this.value)">
         </div>
@@ -1088,7 +1090,7 @@ async function loadAll() {
 // ═══════════════════════════════════════════
 async function loadReservations() {
   const {data} = await sb.from('reservations')
-    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences)')
+    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, no_show, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences,derniere_absence)')
     .order('date_rdv',{ascending:false})
     .order('heure_rdv',{ascending:true});
   allResa = data||[];
@@ -1175,7 +1177,10 @@ function renderResa(data) {
       <td style="max-width:180px;font-size:0.82rem">${r.service||'—'}</td>
       <td>${r.barbier||'—'}</td>
       <td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${r.prix||'—'}</td>
-      <td><span class="status-badge status-${r.statut}">${r.statut==='absent'?'🚫 Absent':r.statut}</span></td>
+      <td>
+        <span class="status-badge status-${r.statut}">${r.statut}</span>
+        ${r.no_show?'<span class="badge-noshow">NO SHOW</span>':''}
+      </td>
       <td style="white-space:nowrap">
         <button class="btn-sm btn-info" style="margin-right:4px" onclick="openResaModal('${r.id}')">Voir</button>
         ${r.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${r.id}')">Annuler</button>`:''}
@@ -1250,6 +1255,12 @@ function renderWaitlist(data) {
 // ═══════════════════════════════════════════
 // FILTERS & SEARCH
 // ═══════════════════════════════════════════
+function filterResaNoShow(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderResa(allResa.filter(r=>r.no_show===true));
+}
+
 function filterResa(status, btn) {
   currentFilter = status;
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
@@ -1285,33 +1296,36 @@ function searchClients(q) {
 // RESERVATION ACTIONS
 // ═══════════════════════════════════════════
 function marquerAbsent(resaId) {
-  // Ouvrir le modal de confirmation custom
-  document.getElementById('modal-absent-resa-id').value = resaId;
-  document.getElementById('modal-absent-client-id').value = ''; // sera récupéré depuis Supabase
-  document.getElementById('modal-absent').style.display = 'flex';
+  marquerNoShow(resaId, true);
+}
+
+async function marquerNoShow(resaId, isNoShow) {
+  if(isNoShow) {
+    document.getElementById('modal-absent-resa-id').value = resaId;
+    document.getElementById('modal-absent').style.display = 'flex';
+    return;
+  }
+  // Annuler no show directement
+  await sb.from('reservations').update({no_show: false}).eq('id', resaId);
+  showToast('No show annulé ✓', 'ok');
+  closeModal('modal-resa');
+  loadAll();
 }
 
 async function confirmerAbsent() {
   const resaId = document.getElementById('modal-absent-resa-id').value;
   document.getElementById('modal-absent').style.display = 'none';
+  if(!resaId) { showToast('Erreur : ID manquant','error'); return; }
 
-  if(!resaId) { showToast('Erreur : ID réservation manquant','error'); return; }
+  showOverlay("Enregistrement du No Show...");
 
-  showOverlay("Enregistrement de l'absence...");
+  // Mettre no_show = true (on ne touche pas au statut)
+  const {error} = await sb.from('reservations').update({no_show: true}).eq('id', resaId);
+  if(error) { hideOverlay(); showToast('Erreur : '+error.message,'error'); return; }
 
-  // 1. Changer le statut de la résa
-  const {error:ue} = await sb.from('reservations').update({statut:'absent'}).eq('id', resaId);
-  if(ue) { hideOverlay(); showToast('Erreur mise à jour statut : '+ue.message,'error'); return; }
-
-  // Vérifier que le statut a bien changé
-  const {data:check} = await sb.from('reservations').select('statut,client_id').eq('id',resaId).single();
-  if(check?.statut !== 'absent') {
-    hideOverlay();
-    showToast("Erreur : statut non mis à jour. Vérifiez les permissions Supabase.",'error');
-    return;
-  }
-
-  const clientId = check.client_id;
+  // Récupérer client_id depuis Supabase
+  const {data:resaData} = await sb.from('reservations').select('client_id').eq('id',resaId).single();
+  const clientId = resaData?.client_id;
 
   // 2. Récupérer les infos du client
   const {data:client} = await sb.from('clients').select('*').eq('id',clientId).single();
@@ -1392,7 +1406,10 @@ async function openResaModal(id) {
       <div class="info-row"><span class="k">Date</span><span class="v">${resa.date_rdv||'—'}</span></div>
       <div class="info-row"><span class="k">Heure</span><span class="v">${resa.heure_rdv?.substring(0,5)||'—'}</span></div>
       <div class="info-row"><span class="k">Prix</span><span class="v">${resa.prix||'—'} + taxes</span></div>
-      <div class="info-row"><span class="k">Statut</span><span class="v"><span class="status-badge status-${resa.statut}">${resa.statut}</span></span></div>
+      <div class="info-row"><span class="k">Statut</span><span class="v">
+        <span class="status-badge status-${resa.statut}">${resa.statut}</span>
+        ${resa.no_show?'<span class="badge-noshow" style="margin-left:6px">🚫 NO SHOW</span>':''}
+      </span></div>
       <div class="info-row"><span class="k">Rappel envoyé</span><span class="v">${resa.rappel_envoye?'✅ Oui':'⏳ Non'}</span></div>
     </div>
     ${resa.note_client?`
@@ -1416,9 +1433,11 @@ async function openResaModal(id) {
     <button class="btn-sm btn-info" onclick="openEditResaModal('${id}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
-    ${resa.statut==='confirmé'?`<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
-      onclick="marquerAbsent('${id}')">🚫 Marquer absent</button>`:''}
-    ${resa.statut==='absent'?`<span style="font-size:0.75rem;color:var(--red);padding:0.4rem 0.8rem;border:1px solid rgba(231,76,60,0.4);background:rgba(231,76,60,0.08)">🚫 Absence enregistrée</span>`:''}
+    ${!resa.no_show
+      ? `<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
+           onclick="marquerNoShow('${id}',true)">🚫 NO SHOW</button>`
+      : `<button class="btn-sm" style="background:rgba(39,174,96,0.15);border:1px solid var(--green);color:var(--green);font-weight:700"
+           onclick="marquerNoShow('${id}',false)">✅ ANNULER NO SHOW</button>`}
   `;
 
   document.getElementById('modal-resa').classList.add('open');
