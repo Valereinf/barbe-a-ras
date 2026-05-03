@@ -348,7 +348,10 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div class="tab" id="tab-clients">
         <div class="sec-head">
           <h2>Gestion des <span>clients</span></h2>
-          <input class="search-input" type="text" placeholder="Chercher nom / email / tél..." oninput="searchClients(this.value)" id="client-search">
+          <div style="display:flex;gap:0.6rem;align-items:center">
+            <input class="search-input" type="text" placeholder="Chercher nom / email / tél..." oninput="searchClients(this.value)" id="client-search">
+            <button class="btn-sm btn-gold-sm" onclick="openAddClientModal()">+ Ajouter</button>
+          </div>
         </div>
         <table class="data-table">
           <thead><tr>
@@ -578,6 +581,43 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 </div>
 
 <!-- MODAL: MODIFIER CLIENT -->
+<!-- MODAL: AJOUTER CLIENT -->
+<div class="modal-bg" id="modal-add-client">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>👤 Ajouter un client</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-client')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="add-client-photo" value="">
+      <!-- Photo -->
+      <div class="field">
+        <label>Photo (optionnel)</label>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:0.4rem">
+          <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--black);border:2px solid var(--gold4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            <img id="add-client-photo-img" style="width:100%;height:100%;object-fit:cover;display:none">
+            <span id="add-client-photo-placeholder" style="font-size:1.3rem;color:var(--dim2)">👤</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;flex:1">
+            <input type="file" id="add-client-photo-file" accept="image/*" style="display:none" onchange="handleAddClientPhoto(this)">
+            <button type="button" onclick="document.getElementById('add-client-photo-file').click()" style="background:transparent;border:1px solid var(--gold4);color:var(--gold);padding:0.4rem 0.8rem;font-size:0.75rem;letter-spacing:1px;cursor:pointer;text-align:left">📁 Choisir une photo...</button>
+            <button type="button" id="add-client-photo-remove" onclick="removeAddClientPhoto()" style="display:none;background:transparent;border:1px solid rgba(231,76,60,0.4);color:var(--red);padding:0.3rem 0.8rem;font-size:0.75rem;cursor:pointer;text-align:left">✕ Supprimer</button>
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>Prénom *</label><input type="text" id="add-client-prenom" placeholder="Prénom"></div>
+      <div class="field"><label>Nom *</label><input type="text" id="add-client-nom" placeholder="Nom"></div>
+      <div class="field"><label>Téléphone *</label><input type="tel" id="add-client-tel" placeholder="5141234567"></div>
+      <div class="field"><label>Courriel</label><input type="email" id="add-client-email" placeholder="optionnel"></div>
+      <div class="field"><label>Note interne</label><textarea id="add-client-note" rows="2" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.6rem 0.8rem;font-family:'Barlow',sans-serif;font-size:0.85rem;outline:none;resize:vertical" placeholder="Note visible staff uniquement..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)" onclick="closeModal('modal-add-client')">Annuler</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveNewClient()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal-edit-client">
   <div class="modal">
     <div class="modal-head">
@@ -1546,6 +1586,72 @@ async function notifyResaModif(id, client, newDate, newHeure, barbier, service) 
 // ═══════════════════════════════════════════
 // MODIFIER CLIENT (Admin)
 // ═══════════════════════════════════════════
+function openAddClientModal() {
+  document.getElementById('add-client-photo').value = '';
+  document.getElementById('add-client-photo-img').style.display = 'none';
+  document.getElementById('add-client-photo-placeholder').style.display = 'block';
+  document.getElementById('add-client-photo-remove').style.display = 'none';
+  document.getElementById('add-client-photo-file').value = '';
+  document.getElementById('add-client-prenom').value = '';
+  document.getElementById('add-client-nom').value = '';
+  document.getElementById('add-client-tel').value = '';
+  document.getElementById('add-client-email').value = '';
+  document.getElementById('add-client-note').value = '';
+  document.getElementById('modal-add-client').classList.add('open');
+}
+
+function handleAddClientPhoto(input) {
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024) { showToast('Photo trop grande — max 2MB','error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('add-client-photo').value = e.target.result;
+    document.getElementById('add-client-photo-img').src = e.target.result;
+    document.getElementById('add-client-photo-img').style.display = 'block';
+    document.getElementById('add-client-photo-placeholder').style.display = 'none';
+    document.getElementById('add-client-photo-remove').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeAddClientPhoto() {
+  document.getElementById('add-client-photo').value = '';
+  document.getElementById('add-client-photo-img').style.display = 'none';
+  document.getElementById('add-client-photo-placeholder').style.display = 'block';
+  document.getElementById('add-client-photo-remove').style.display = 'none';
+  document.getElementById('add-client-photo-file').value = '';
+}
+
+async function saveNewClient() {
+  const prenom = document.getElementById('add-client-prenom').value.trim();
+  const nom    = document.getElementById('add-client-nom').value.trim();
+  const tel    = document.getElementById('add-client-tel').value.replace(/\D/g,'').slice(-10);
+  const email  = document.getElementById('add-client-email').value.trim();
+  const note   = document.getElementById('add-client-note').value.trim();
+  const photo  = document.getElementById('add-client-photo').value;
+
+  if(!prenom||!nom) { showToast('Prénom et nom requis','error'); return; }
+  if(!tel)          { showToast('Téléphone requis','error'); return; }
+
+  // Vérifier doublon téléphone
+  const {data:existing} = await sb.from('clients').select('id,prenom,nom').eq('telephone',tel).maybeSingle();
+  if(existing) {
+    showToast(`Ce téléphone appartient déjà à ${existing.prenom} ${existing.nom}`,'error');
+    return;
+  }
+
+  const {error} = await sb.from('clients').insert({
+    prenom, nom, telephone:tel, email:email||null,
+    note_client:note||null, photo_url:photo||null
+  });
+  if(error) { showToast('Erreur : '+error.message,'error'); return; }
+
+  showToast('Client ajouté ✅','ok');
+  closeModal('modal-add-client');
+  loadClients();
+}
+
 function handleClientPhotoUpload(input) {
   const file = input.files[0];
   if(!file) return;
