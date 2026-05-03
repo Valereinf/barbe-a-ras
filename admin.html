@@ -85,6 +85,7 @@ html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--black);co
   letter-spacing:1px;text-transform:uppercase;font-weight:600}
 .status-confirmé{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
 .status-annulé{background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3)}
+.status-absent{background:rgba(180,0,0,0.2);color:#ff6b6b;border:1px solid rgba(180,0,0,0.5);font-weight:700}
 .status-en_attente{background:rgba(52,152,219,0.1);color:var(--blue);border:1px solid rgba(52,152,219,0.3)}
 .status-notifié{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
 .blocked-row td{opacity:0.5}
@@ -381,6 +382,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
           <button class="filter-btn active" onclick="filterResa('all',this)">Toutes</button>
           <button class="filter-btn" onclick="filterResa('confirmé',this)">Confirmées</button>
           <button class="filter-btn" onclick="filterResa('annulé',this)">Annulées</button>
+          <button class="filter-btn" onclick="filterResa('absent',this)" style="color:#ff6b6b;border-color:rgba(180,0,0,0.4)">🚫 Absents</button>
           <input type="date" id="filter-date" onchange="filterByDate(this.value)">
           <input class="search-input" type="text" placeholder="Chercher nom / service..." oninput="searchResa(this.value)">
         </div>
@@ -1173,7 +1175,7 @@ function renderResa(data) {
       <td style="max-width:180px;font-size:0.82rem">${r.service||'—'}</td>
       <td>${r.barbier||'—'}</td>
       <td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${r.prix||'—'}</td>
-      <td><span class="status-badge status-${r.statut}">${r.statut}</span></td>
+      <td><span class="status-badge status-${r.statut}">${r.statut==='absent'?'🚫 Absent':r.statut}</span></td>
       <td style="white-space:nowrap">
         <button class="btn-sm btn-info" style="margin-right:4px" onclick="openResaModal('${r.id}')">Voir</button>
         ${r.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${r.id}')">Annuler</button>`:''}
