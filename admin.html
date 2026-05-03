@@ -1304,19 +1304,40 @@ function searchClients(q) {
 // RESERVATION ACTIONS
 // ═══════════════════════════════════════════
 async function marquerAbsent(resaId) {
-  // Vérifier l'état actuel
   const resa = allResa.find(r=>r.id===resaId);
-  if(resa && resa.no_show) {
+
+  if(resa && resa.no_show===true) {
     // Déjà absent — annuler
     await sb.from('reservations').update({no_show: false}).eq('id', resaId);
     showToast('Absence annulée ✓', 'ok');
     closeModal('modal-resa');
-    loadAll();
+    await loadAll();
     return;
   }
-  // Ouvrir le modal de confirmation
-  document.getElementById('modal-absent-resa-id').value = resaId;
-  document.getElementById('modal-absent').style.display = 'flex';
+
+  // Marquer absent directement — confirmation via toast
+  showOverlay("Enregistrement de l'absence...");
+  try {
+    await sb.from('reservations').update({no_show: true}).eq('id', resaId);
+
+    // Mettre à jour client
+    const clientId = resa?.client_id || (await sb.from('reservations').select('client_id').eq('id',resaId).single()).data?.client_id;
+    if(clientId) {
+      const {data:cl} = await sb.from('clients').select('nb_absences').eq('id',clientId).single();
+      await sb.from('clients').update({
+        nb_absences: (cl?.nb_absences||0)+1,
+        derniere_absence: new Date().toISOString().split('T')[0]
+      }).eq('id',clientId);
+    }
+
+    showToast('Absence enregistrée ✓','ok');
+    closeModal('modal-resa');
+  } catch(e) {
+    showToast('Erreur : '+e.message,'error');
+  } finally {
+    hideOverlay();
+    await loadAll();
+  }
 }
 
 async function confirmerAbsent() {
@@ -1327,16 +1348,17 @@ async function confirmerAbsent() {
   showOverlay("Enregistrement de l'absence...");
 
   try {
-    // 1. Mettre no_show = true
-    const {data:updData, error} = await sb.from('reservations')
+    // 1. Mettre no_show = true — simple update sans select
+    const {error} = await sb.from('reservations')
       .update({no_show: true})
-      .eq('id', resaId)
-      .select('id,no_show,client_id')
-      .single();
+      .eq('id', resaId);
 
     if(error) { showToast('Erreur Supabase : '+error.message,'error'); return; }
 
-    const clientId = updData?.client_id;
+    // 2. Récupérer le client_id séparément
+    const {data:resaInfo} = await sb.from('reservations')
+      .select('client_id').eq('id', resaId).single();
+    const clientId = resaInfo?.client_id;
 
     if(clientId) {
       // 2. Récupérer infos client
@@ -1439,7 +1461,7 @@ async function openResaModal(id) {
     <button class="btn-sm btn-info" onclick="openEditResaModal('${id}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
-    ${!resa.no_show
+    ${resa.no_show!==true
       ? `<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
            onclick="marquerAbsent('${id}')">🚫 Absent</button>`
       : `<button class="btn-sm" style="background:rgba(39,174,96,0.15);border:1px solid var(--green);color:var(--green);font-weight:700"
