@@ -1296,10 +1296,21 @@ async function confirmerAbsent() {
   const clientId = document.getElementById('modal-absent-client-id').value;
   document.getElementById('modal-absent').style.display = 'none';
 
+  if(!resaId || !clientId) { showToast('Erreur : IDs manquants','error'); return; }
+
   showOverlay("Enregistrement de l'absence...");
 
   // 1. Changer le statut de la résa
-  await sb.from('reservations').update({statut:'absent'}).eq('id', resaId);
+  const {error:ue} = await sb.from('reservations').update({statut:'absent'}).eq('id', resaId);
+  if(ue) { hideOverlay(); showToast('Erreur mise à jour statut : '+ue.message,'error'); return; }
+
+  // Vérifier que le statut a bien changé
+  const {data:check} = await sb.from('reservations').select('statut').eq('id',resaId).single();
+  if(check?.statut !== 'absent') {
+    hideOverlay();
+    showToast("Erreur : statut non mis à jour. Vérifiez les permissions Supabase.",'error');
+    return;
+  }
 
   // 2. Récupérer les infos du client
   const {data:client} = await sb.from('clients').select('*').eq('id',clientId).single();
