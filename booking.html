@@ -362,9 +362,51 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
         <div id="blocked-msg" style="display:none;background:rgba(231,76,60,0.1);border:1px solid var(--red);padding:1rem;margin-top:1rem;font-size:0.85rem;color:var(--red)">
           ⛔ Ce compte est actuellement suspendu. Veuillez contacter le salon au (418) 612-2007.
         </div>
-        <div class="btn-row">
+        <!-- Options avant finalisation -->
+        <div id="booking-options" style="display:flex;flex-direction:column;gap:0.6rem;margin-top:1.5rem">
+          <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Que souhaitez-vous faire ?</div>
+          <button class="btn-gold" id="b4" onclick="submitBooking()" disabled style="text-align:left;padding:1rem 1.2rem">
+            ✅ Confirmer ce rendez-vous
+          </button>
+          <button id="b4-periodic" onclick="togglePeriodicPanel()" disabled
+            style="background:transparent;border:1px solid var(--gold4);color:var(--dim);padding:1rem 1.2rem;font-family:'Barlow',sans-serif;font-size:0.8rem;letter-spacing:1px;cursor:pointer;text-align:left;transition:all 0.2s">
+            🔁 Réservation périodique — répéter ce RDV plusieurs fois
+          </button>
+        </div>
+
+        <!-- Panneau périodique (caché par défaut) -->
+        <div id="periodic-panel" style="display:none;margin-top:1rem;background:rgba(201,168,76,0.05);border:1px solid var(--gold4);padding:1.5rem">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold);margin-bottom:1rem">🔁 RÉSERVATION PÉRIODIQUE</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+            <div>
+              <label style="font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Fréquence (semaines)</label>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <button onclick="adjFreq(-1)" style="background:var(--charcoal);border:1px solid var(--gold4);color:var(--white);width:32px;height:32px;cursor:pointer;font-size:1rem">−</button>
+                <span id="freq-val" style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);min-width:30px;text-align:center">2</span>
+                <button onclick="adjFreq(1)" style="background:var(--charcoal);border:1px solid var(--gold4);color:var(--white);width:32px;height:32px;cursor:pointer;font-size:1rem">+</button>
+                <span style="font-size:0.75rem;color:var(--dim2)">sem.</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Nombre de RDV</label>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <button onclick="adjCount(-1)" style="background:var(--charcoal);border:1px solid var(--gold4);color:var(--white);width:32px;height:32px;cursor:pointer;font-size:1rem">−</button>
+                <span id="count-val" style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);min-width:30px;text-align:center">3</span>
+                <button onclick="adjCount(1)" style="background:var(--charcoal);border:1px solid var(--gold4);color:var(--white);width:32px;height:32px;cursor:pointer;font-size:1rem">+</button>
+                <span style="font-size:0.75rem;color:var(--dim2)">RDV</span>
+              </div>
+            </div>
+          </div>
+          <!-- Récapitulatif des dates -->
+          <div id="periodic-dates" style="margin:1rem 0"></div>
+          <button id="b4-confirm-periodic" onclick="submitPeriodicBooking()"
+            style="width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--black);padding:1rem;border:none;font-family:'Barlow',sans-serif;font-size:0.82rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-top:0.5rem">
+            ✅ CONFIRMER LES RDV PÉRIODIQUES
+          </button>
+        </div>
+
+        <div class="btn-row" style="margin-top:1rem">
           <button class="btn-back" onclick="goStep(3)">← Retour</button>
-          <button class="btn-gold" id="b4" onclick="submitBooking()" disabled>Confirmer le rendez-vous →</button>
         </div>
       </div>
     </div>
@@ -914,6 +956,8 @@ function updSum(){
 function chkForm(){
   const ok=document.getElementById('f-prenom').value.trim()&&document.getElementById('f-nom').value.trim()&&document.getElementById('f-tel').value.trim()&&document.getElementById('policy').checked;
   document.getElementById('b4').disabled=!ok;
+  const pb=document.getElementById('b4-periodic');
+  if(pb){pb.disabled=!ok;pb.style.color=ok?'var(--gold)':'var(--dim2)';pb.style.borderColor=ok?'var(--gold4)':'rgba(245,240,232,0.1)';}
 }
 
 async function submitBooking(){
@@ -1030,6 +1074,152 @@ async function submitWaitlist(){
 function showOverlay(msg){document.getElementById('overlay-msg').textContent=msg||'Traitement...';document.getElementById('overlay').classList.add('show');}
 function hideOverlay(){document.getElementById('overlay').classList.remove('show');}
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>t.className='toast',3500);}
+// ═══════════════════════════════════════════
+// RÉSERVATION PÉRIODIQUE
+// ═══════════════════════════════════════════
+let _periodicFreq = 2;  // semaines
+let _periodicCount = 3; // nombre de RDV
+
+function togglePeriodicPanel() {
+  const panel = document.getElementById('periodic-panel');
+  const isVisible = panel.style.display !== 'none';
+  panel.style.display = isVisible ? 'none' : 'block';
+  if(!isVisible) renderPeriodicDates();
+}
+
+function adjFreq(delta) {
+  _periodicFreq = Math.max(1, Math.min(12, _periodicFreq + delta));
+  document.getElementById('freq-val').textContent = _periodicFreq;
+  renderPeriodicDates();
+}
+
+function adjCount(delta) {
+  _periodicCount = Math.max(2, Math.min(20, _periodicCount + delta));
+  document.getElementById('count-val').textContent = _periodicCount;
+  renderPeriodicDates();
+}
+
+function renderPeriodicDates() {
+  if(!S.date || !S.time) return;
+  const container = document.getElementById('periodic-dates');
+  const dates = getPeriodicDates();
+  container.innerHTML = `
+    <div style="font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);margin-bottom:0.6rem">
+      Récapitulatif des ${dates.length} rendez-vous :
+    </div>
+    ${dates.map((d,i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.8rem;
+        background:${i===0?'rgba(201,168,76,0.1)':'var(--charcoal)'};
+        border:1px solid ${i===0?'var(--gold4)':'rgba(245,240,232,0.08)'};margin-bottom:3px;font-size:0.82rem">
+        <span style="color:${i===0?'var(--gold)':'var(--dim)'}">
+          ${i===0?'1er RDV (celui-ci)':'RDV '+(i+1)}
+        </span>
+        <span style="color:var(--white);font-weight:500">
+          ${d.toLocaleDateString('fr-CA',{weekday:'short',day:'numeric',month:'short',year:'numeric'})} à ${S.time}
+        </span>
+      </div>`).join('')}`;
+}
+
+function getPeriodicDates() {
+  if(!S.date) return [];
+  const dates = [new Date(S.date)];
+  for(let i=1; i<_periodicCount; i++) {
+    const next = new Date(dates[dates.length-1]);
+    next.setDate(next.getDate() + _periodicFreq * 7);
+    dates.push(next);
+  }
+  return dates;
+}
+
+async function submitPeriodicBooking() {
+  const prenom = document.getElementById('f-prenom').value.trim();
+  const nom    = document.getElementById('f-nom').value.trim();
+  const email  = document.getElementById('f-email').value.trim();
+  const tel    = document.getElementById('f-tel').value.trim();
+  const note   = document.getElementById('f-note').value.trim();
+  const finalBarber = S.assignedBarber || S.barber;
+
+  showOverlay('Vérification du compte...');
+  const telClean = tel.replace(/\D/g,'').slice(-10);
+  const {data:clientsFound} = await sb.from('clients').select('id,est_bloque').eq('telephone',telClean);
+  const existingClient = clientsFound && clientsFound.length > 0 ? clientsFound[0] : null;
+  if(existingClient?.est_bloque){hideOverlay();document.getElementById('blocked-msg').style.display='block';return;}
+
+  showOverlay('Création des réservations périodiques...');
+  let clientId = existingClient?.id;
+  if(!clientId){
+    const {data:nc,error:ce} = await sb.from('clients').insert({prenom,nom,email:email||null,telephone:telClean}).select('id').single();
+    if(ce){hideOverlay();showToast('Erreur réseau. Réessayez.','error');return;}
+    clientId = nc.id;
+  } else {
+    await sb.from('clients').update({prenom,nom,email:email||null}).eq('id',clientId);
+  }
+
+  const svcNames  = getSvcNames();
+  const totalPrice = getTotalPrice().toFixed(2)+'$';
+  const dates = getPeriodicDates();
+
+  // Générer un groupe_id commun pour lier tous les RDV périodiques
+  const groupeId = crypto.randomUUID();
+
+  // Insérer tous les RDV en une seule fois
+  const rows = dates.map(d => ({
+    client_id: clientId,
+    barbier: finalBarber,
+    service: svcNames,
+    prix: totalPrice,
+    date_rdv: d.toISOString().split('T')[0],
+    heure_rdv: S.time,
+    statut: 'confirmé',
+    note_client: note||null,
+    groupe_id: groupeId
+  }));
+
+  const {data:resaData, error:re} = await sb.from('reservations').insert(rows).select('id');
+  if(re){hideOverlay();showToast('Erreur : '+re.message,'error');return;}
+
+  // Envoyer une seule notification (pour le premier RDV)
+  try {
+    await fetch('/.netlify/functions/send-confirmation',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        reservationId: resaData[0].id, prenom, nom, email, tel,
+        barbier: finalBarber, service: svcNames, prix: totalPrice,
+        date: dates[0].toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+        heure: S.time, note,
+        isPeriodic: true,
+        periodicCount: dates.length,
+        periodicFreq: _periodicFreq
+      })
+    });
+  } catch(e){}
+
+  hideOverlay();
+
+  // Afficher confirmation avec toutes les dates
+  S.existingResaId = resaData[0].id;
+  S.existingResaServices = svcNames;
+  S.existingResaPrice = getTotalPrice();
+  S.savedClient = {prenom,nom,email,tel,note};
+
+  const datesHtml = dates.map((d,i)=>`
+    <div class="row">
+      <span class="k">RDV ${i+1}</span>
+      <span class="v">${d.toLocaleDateString('fr-CA',{weekday:'short',day:'numeric',month:'short'})} à ${S.time}</span>
+    </div>`).join('');
+
+  document.getElementById('confirm-detail').innerHTML=`
+    <div class="row"><span class="k">Barbier·ère</span><span class="v">${finalBarber}</span></div>
+    <div class="row"><span class="k">Service</span><span class="v">${svcNames}</span></div>
+    <div class="row"><span class="k">Fréquence</span><span class="v">Toutes les ${_periodicFreq} semaine${_periodicFreq>1?'s':''}</span></div>
+    <div class="row"><span class="k">Prix/RDV</span><span class="v" style="color:var(--gold)">${totalPrice} + taxes</span></div>
+    ${datesHtml}`;
+
+  document.getElementById('conf-tel').textContent = tel;
+  if(email){document.getElementById('conf-email-msg').style.display='block';document.getElementById('conf-email-disp').textContent=email;}
+  goStep(5);
+}
+
 function addAnotherService(){
   // Garder : barbier, savedClient
   const savedBarber = S.barber;
