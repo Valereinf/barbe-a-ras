@@ -129,6 +129,17 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .add-pause-btn:hover{border-color:var(--gold);color:var(--gold)}
 .day-closed{font-size:0.8rem;color:var(--dim2);font-style:italic}
 
+/* BOUTONS CONTACT */
+.btn-contact{display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;font-size:0.75rem;font-family:'Barlow',sans-serif;letter-spacing:1px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.2s;border:1px solid}
+.btn-contact.tel{color:#27ae60;border-color:rgba(39,174,96,0.4);background:rgba(39,174,96,0.08)}
+.btn-contact.tel:hover{background:rgba(39,174,96,0.18)}
+.btn-contact.sms{color:#3498db;border-color:rgba(52,152,219,0.4);background:rgba(52,152,219,0.08)}
+.btn-contact.sms:hover{background:rgba(52,152,219,0.18)}
+.btn-contact.mail{color:var(--gold);border-color:var(--gold4);background:rgba(201,168,76,0.06)}
+.btn-contact.mail:hover{background:rgba(201,168,76,0.15)}
+.btn-contact.disabled{opacity:0.3;cursor:not-allowed;pointer-events:none}
+.contact-bar{display:flex;flex-wrap:wrap;gap:0.5rem;padding:0.8rem;background:rgba(201,168,76,0.04);border:1px solid var(--gold4);margin-bottom:0.8rem}
+
 /* SECTION HEADER */
 .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
 .sec-head h2{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2px}
@@ -1116,8 +1127,12 @@ function renderClients(data) {
   tbody.innerHTML = data.map(c=>`
     <tr class="${c.est_bloque?'blocked-row':''}">
       <td><strong>${c.prenom} ${c.nom}</strong></td>
-      <td>${c.telephone||'—'}</td>
-      <td style="font-size:0.82rem">${c.email||'—'}</td>
+      <td>${c.telephone
+        ? `<a href="tel:+1${c.telephone.replace(/\D/g,'').slice(-10)}" style="color:var(--green);text-decoration:none;font-weight:600">${c.telephone}</a>`
+        : '—'}</td>
+      <td style="font-size:0.82rem">${c.email
+        ? `<a href="mailto:${c.email}" style="color:var(--gold);text-decoration:none">${c.email}</a>`
+        : '—'}</td>
       <td style="font-size:0.78rem;color:var(--dim2)">${c.created_at?.split('T')[0]||'—'}</td>
       <td>${c.est_bloque
         ?'<span class="status-badge status-annulé">Bloqué</span>'
@@ -1220,6 +1235,7 @@ async function openResaModal(id) {
 
   // Load staff notes for this reservation
   document.getElementById('modal-resa-body').innerHTML = `
+    ${contactBar(client.telephone, client.email)}
     <div style="margin-bottom:1.5rem">
       <div class="info-row"><span class="k">Client</span><span class="v">${client.prenom||''} ${client.nom||''}</span></div>
       <div class="info-row"><span class="k">Téléphone</span><span class="v">${client.telephone||'—'}</span></div>
@@ -1286,6 +1302,7 @@ async function openClientModal(clientId) {
 
   document.getElementById('modal-client-name').textContent = `${client.prenom} ${client.nom}`;
   document.getElementById('modal-client-body').innerHTML = `
+    ${contactBar(client.telephone, client.email)}
     <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--gold4)">
       <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--charcoal);border:2px solid var(--gold4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
         ${client.photo_url
@@ -2600,6 +2617,46 @@ function validateHoraires(rows) {
     }
   }
   return null; // OK
+}
+
+// ─── Barre de contact client ───
+function contactBar(tel, email) {
+  const telClean = (tel||'').replace(/\D/g,'');
+  const telFmt   = telClean ? `+1${telClean.slice(-10)}` : '';
+  const telDisp  = telClean ? `(${telClean.slice(-10,7).substring(0,3)}) ${telClean.slice(-7,4).substring(0,3)}-${telClean.slice(-4)}` : '—';
+  const smsBody  = encodeURIComponent('Bonjour, ceci est un message de Barbe-À-Ras.');
+  // Sur mobile (écran < 768px) : liens tel: et sms: directs
+  // Sur desktop : afficher le numéro en clair + copier dans le presse-papier
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  return `<div class="contact-bar">
+    <span style="font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);align-self:center">Contacter :</span>
+    ${telFmt
+      ? isMobile
+        ? `<a href="tel:${telFmt}" class="btn-contact tel">📞 Appeler</a>
+           <a href="sms:${telFmt}?body=${smsBody}" class="btn-contact sms">💬 SMS</a>`
+        : `<span class="btn-contact tel" onclick="copyToClipboard('${telClean.slice(-10)}','Numéro copié !')" style="cursor:pointer" title="Cliquer pour copier">
+             📞 ${telDisp} <span style="font-size:0.65rem;opacity:0.6">· copier</span>
+           </span>
+           <a href="sms:${telFmt}?body=${smsBody}" class="btn-contact sms" title="Ouvrir dans l'app Messages si disponible">💬 SMS</a>`
+      : `<span class="btn-contact tel disabled">📞 Pas de tél.</span>
+         <span class="btn-contact sms disabled">💬 SMS</span>`}
+    ${email
+      ? `<a href="mailto:${email}" class="btn-contact mail">✉️ ${email}</a>`
+      : `<span class="btn-contact mail disabled">✉️ Pas de courriel</span>`}
+  </div>`;
+}
+
+function copyToClipboard(text, msg) {
+  navigator.clipboard?.writeText(text).then(()=>showToast(msg||'Copié !','ok')).catch(()=>{
+    // Fallback pour navigateurs sans clipboard API
+    const el = document.createElement('textarea');
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast(msg||'Copié !','ok');
+  });
 }
 
 function showToast(msg, type='') {
