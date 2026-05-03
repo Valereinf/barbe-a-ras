@@ -189,16 +189,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
             <span class="barber-name">Sans préférence</span>
             <span class="barber-role">Premier disponible</span>
           </div>
-          <div class="barber-card" onclick="selBarber(this,'Barbara Sandra')">
-            <div class="barber-avatar">BS</div>
-            <span class="barber-name">Barbara Sandra</span>
-            <span class="barber-role">Barbière principale</span>
-          </div>
-          <div class="barber-card" onclick="selBarber(this,'Michael')">
-            <div class="barber-avatar">MK</div>
-            <span class="barber-name">Michael</span>
-            <span class="barber-role">Barbier</span>
-          </div>
+          <!-- cartes chargées dynamiquement -->
         </div>
         <div class="btn-row" style="justify-content:flex-end">
           <button class="btn-gold" id="b1" onclick="goStep(2)" disabled>Continuer →</button>
@@ -448,7 +439,30 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const FR_M=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const FR_D=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 
-let S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null};
+let S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
+let _bookingCollabs=[];
+
+async function loadBookingCollabs(){
+  if(_bookingCollabs.length) return _bookingCollabs;
+  const {data}=await sb.from('collaborateurs').select('*').eq('actif',true).order('ordre').order('nom');
+  _bookingCollabs=data||[];
+  const grid=document.querySelector('.barber-grid');
+  if(grid){
+    _bookingCollabs.forEach(c=>{
+      const initials=c.nom.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      const card=document.createElement('div');
+      card.className='barber-card';
+      card.innerHTML=`
+        ${c.photo_url?`<img src="${c.photo_url}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid ${c.couleur}44">`:
+          `<div class="barber-avatar" style="background:${c.couleur}22;color:${c.couleur};border:2px solid ${c.couleur}44">${initials}</div>`}
+        <span class="barber-name">${c.nom}</span>
+        <span class="barber-role">Barbier·ère</span>`;
+      card.onclick=()=>selBarber(card,c.nom);
+      grid.appendChild(card);
+    });
+  }
+  return _bookingCollabs;
+}
 
 function goStep(n){
   const screens=['sc1','sc2','sc3','sc4','sc5','sc-waitlist','sc-wl-conf'];
@@ -706,26 +720,39 @@ async function selDay(d,dt,el){
     return;
   }
 
-  const [indiResp, rB, rM] = await Promise.all([
+  const collabs = await loadBookingCollabs();
+  const collabNames = collabs.map(c=>c.nom);
+
+  const [indiResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
-    sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier','Barbara Sandra').eq('statut','confirmé'),
-    sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier','Michael').eq('statut','confirmé')
+    ...collabNames.map(nom=>sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier',nom).eq('statut','confirmé'))
   ]);
 
   hideOverlay();
   const indis = indiResp.data||[];
-  const barbaraBlocked = isBarberBlocked(indis,'Barbara Sandra') || !getBarberDayRange('Barbara Sandra',dt);
-  const michaelBlocked = isBarberBlocked(indis,'Michael') || !getBarberDayRange('Michael',dt);
-  const blockedSlotsB = getBlockedSlotsFromIndi(indis,'Barbara Sandra',dt);
-  const blockedSlotsM = getBlockedSlotsFromIndi(indis,'Michael',dt);
-  const busyB = getBusyIntervals(rB.data||[], SVC_DUR);
-  const busyM = getBusyIntervals(rM.data||[], SVC_DUR);
+  const collabData = collabNames.map((nom,i)=>({
+    nom,
+    collab: collabs[i],
+    blocked: isBarberBlocked(indis,nom) || !getBarberDayRange(nom,dt),
+    blockedSlots: getBlockedSlotsFromIndi(indis,nom,dt),
+    busy: getBusyIntervals(resaResps[i]?.data||[], SVC_DUR)
+  }));
 
   document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
 
   if(S.barber==='Sans préférence'){
-    const availM = michaelBlocked ? [] : getAvailableSlots(dt, busyM, requestedDur, blockedSlotsM, 'Michael');
-    const availB = barbaraBlocked ? [] : getAvailableSlots(dt, busyB, requestedDur, blockedSlotsB, 'Barbara Sandra');
+    // Calculer avail pour chaque collaborateur
+    const collabAvails = collabData.map(cd=>({
+      ...cd,
+      avail: cd.blocked ? [] : getAvailableSlots(dt, cd.busy, requestedDur, cd.blockedSlots, cd.nom)
+    }));
+    // Trier : premier dispo d'abord (ordre Supabase)
+    const anyAvail = collabAvails.some(ca=>ca.avail.length>0);
+    // Pour rétrocompatibilité on garde Michael/Barbara mais générique
+    const availM = collabAvails[0]?.avail||[];
+    const availB = collabAvails[1]?.avail||[];
+    const barbaraBlocked = collabAvails[1]?.blocked??true;
+    const michaelBlocked = collabAvails[0]?.blocked??true;
     if(availM.length===0 && availB.length===0){
       document.getElementById('waitlist-banner').style.display='block';return;
     }
@@ -1035,6 +1062,9 @@ function addAnotherService(){
   chkForm();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+
+// Charger les collaborateurs au démarrage
+loadBookingCollabs();
 
 function resetAll(){
   S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
