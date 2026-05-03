@@ -633,6 +633,19 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         </div>
         <input type="hidden" id="collab-couleur-val" value="#C9A84C">
       </div>
+      <div>
+        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;display:block;margin-bottom:0.5rem">Genre</label>
+        <div style="display:flex;gap:0.8rem">
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.85rem;color:var(--dim)">
+            <input type="radio" name="collab-genre" id="collab-genre-m" value="masculin" checked style="accent-color:var(--gold)">
+            Masculin <span style="font-size:0.72rem;color:var(--dim2)">(Barbier)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.85rem;color:var(--dim)">
+            <input type="radio" name="collab-genre" id="collab-genre-f" value="feminin" style="accent-color:var(--gold)">
+            Féminin <span style="font-size:0.72rem;color:var(--dim2)">(Barbière)</span>
+          </label>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:0.8rem">
         <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Actif</label>
         <label class="horaire-toggle">
@@ -2353,6 +2366,9 @@ async function editCollab(id) {
   document.getElementById('collab-edit-id').value = data.id;
   document.getElementById('collab-actif-toggle').checked = data.actif;
   document.getElementById('collab-couleur-val').value = data.couleur||'#C9A84C';
+  const genre = data.genre||'masculin';
+  document.getElementById('collab-genre-m').checked = genre==='masculin';
+  document.getElementById('collab-genre-f').checked = genre==='feminin';
   resetPhotoUI(data.photo_url||'');
   document.querySelectorAll('.couleur-opt').forEach(o => {
     o.style.borderColor = o.dataset.c === data.couleur ? '#fff' : 'transparent';
@@ -2379,11 +2395,12 @@ async function saveCollab() {
   const photo  = document.getElementById('collab-photo').value.trim();
   const couleur= document.getElementById('collab-couleur-val').value;
   const actif  = document.getElementById('collab-actif-toggle').checked;
+  const genre  = document.querySelector('input[name="collab-genre"]:checked')?.value || 'masculin';
   const id     = document.getElementById('collab-edit-id').value;
   if(!nom) { showToast('Le nom est obligatoire','error'); return; }
 
   if(id) {
-    const {error} = await sb.from('collaborateurs').update({nom,photo_url:photo,couleur,actif}).eq('id',id);
+    const {error} = await sb.from('collaborateurs').update({nom,photo_url:photo,couleur,actif,genre}).eq('id',id);
     if(error) { showToast('Erreur: '+error.message,'error'); return; }
     showToast('Collaborateur mis à jour ✓','success');
   } else {
@@ -2392,7 +2409,7 @@ async function saveCollab() {
     if(existing && existing.length) { showToast('Un collaborateur avec ce nom existe déjà','error'); return; }
     const maxOrdre = await sb.from('collaborateurs').select('ordre').order('ordre',{ascending:false}).limit(1);
     const ordre = ((maxOrdre.data||[])[0]?.ordre||0) + 1;
-    const {error} = await sb.from('collaborateurs').insert({nom,photo_url:photo,couleur,actif,ordre});
+    const {error} = await sb.from('collaborateurs').insert({nom,photo_url:photo,couleur,actif,ordre,genre});
     if(error) { showToast('Erreur: '+error.message,'error'); return; }
     // Créer les horaires par défaut pour ce collaborateur
     const defaultRows = [0,1,2,3,4,5,6].map(dow=>({barbier:nom,dow,actif:dow>=2&&dow<=6,debut:'09:00',fin:'17:00',pauses:[]}));
