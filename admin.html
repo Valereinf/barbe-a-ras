@@ -129,6 +129,10 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .add-pause-btn:hover{border-color:var(--gold);color:var(--gold)}
 .day-closed{font-size:0.8rem;color:var(--dim2);font-style:italic}
 
+/* BADGE ABSENCE */
+.absence-badge{display:inline-flex;align-items:center;gap:0.3rem;background:rgba(231,76,60,0.12);
+  border:1px solid rgba(231,76,60,0.5);color:var(--red);padding:0.25rem 0.6rem;
+  font-size:0.72rem;letter-spacing:1px;font-weight:700}
 /* BOUTONS CONTACT */
 .btn-contact{display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;font-size:0.75rem;font-family:'Barlow',sans-serif;letter-spacing:1px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.2s;border:1px solid}
 .btn-contact.tel{color:#27ae60;border-color:rgba(39,174,96,0.4);background:rgba(39,174,96,0.08)}
@@ -1165,7 +1169,8 @@ function renderClients(data) {
       <td style="font-size:0.78rem;color:var(--dim2)">${c.created_at?.split('T')[0]||'—'}</td>
       <td>${c.est_bloque
         ?'<span class="status-badge status-annulé">Bloqué</span>'
-        :'<span class="status-badge status-confirmé">Actif</span>'}</td>
+        :'<span class="status-badge status-confirmé">Actif</span>'}
+        ${(c.nb_absences||0)>0?`<span class="absence-badge" style="margin-left:4px;font-size:0.65rem" title="Dernière : ${c.derniere_absence||'?'}">🚫 ${c.nb_absences}</span>`:''}</td>
       <td style="white-space:nowrap">
         <button class="btn-sm btn-info" style="margin-right:4px;display:inline-flex;align-items:center;gap:0.4rem" onclick="openClientModal('${c.id}')">
           ${c.photo_url?`<img src="${c.photo_url}" style="width:18px;height:18px;border-radius:50%;object-fit:cover">`:'👤'}
@@ -1250,6 +1255,62 @@ function searchClients(q) {
 // ═══════════════════════════════════════════
 // RESERVATION ACTIONS
 // ═══════════════════════════════════════════
+async function marquerAbsent(resaId, clientId) {
+  if(!confirm('Marquer ce client comme absent et lui envoyer une notification de pénalité ?')) return;
+
+  showOverlay("Enregistrement de l'absence...");
+
+  // 1. Changer le statut de la résa
+  await sb.from('reservations').update({statut:'absent'}).eq('id', resaId);
+
+  // 2. Récupérer les infos du client
+  const {data:client} = await sb.from('clients').select('*').eq('id',clientId).single();
+  if(!client){hideOverlay();showToast('Client introuvable','error');return;}
+
+  const nbAbs = (client.nb_absences||0) + 1;
+  const today = new Date().toISOString().split('T')[0];
+
+  // 3. Incrémenter nb_absences et mettre à jour derniere_absence
+  await sb.from('clients').update({
+    nb_absences: nbAbs,
+    derniere_absence: today
+  }).eq('id', clientId);
+
+  // 4. Récupérer les détails de la réservation
+  const {data:resa} = await sb.from('reservations').select('*').eq('id',resaId).single();
+  const frais = (resa?.service||'').includes('barbe')||((resa?.service||'').includes('lame'))
+    ? '35,00 $ + taxes' : '19,50 $ + taxes';
+
+  // 5. Envoyer email de notification pénalité
+  if(client.email) {
+    try {
+      await fetch('/.netlify/functions/send-confirmation', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          type: 'absence-penalty',
+          reservationId: resaId,
+          prenom: client.prenom,
+          nom: client.nom,
+          email: client.email,
+          tel: client.telephone,
+          barbier: resa?.barbier||'',
+          service: resa?.service||'',
+          prix: frais,
+          date: resa?.date_rdv||today,
+          heure: resa?.heure_rdv?.substring(0,5)||'',
+          nbAbsences: nbAbs
+        })
+      });
+    } catch(e) {}
+  }
+
+  hideOverlay();
+  showToast('Absence enregistrée — notification envoyée ✓', 'ok');
+  closeModal('modal-resa');
+  loadAll();
+}
+
 async function cancelResa(id) {
   if(!confirm('Annuler ce rendez-vous ?')) return;
   await sb.from('reservations').update({statut:'annulé'}).eq('id',id);
@@ -1305,6 +1366,9 @@ async function openResaModal(id) {
     <button class="btn-sm btn-info" onclick="openEditResaModal('${id}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
+    ${resa.statut==='confirmé'?`<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
+      onclick="marquerAbsent('${id}','${resa.client_id}')">🚫 Marquer absent</button>`:''}
+    ${resa.statut==='absent'?`<span style="font-size:0.75rem;color:var(--red);padding:0.4rem 0.8rem;border:1px solid rgba(231,76,60,0.4);background:rgba(231,76,60,0.08)">🚫 Absence enregistrée</span>`:''}
   `;
 
   document.getElementById('modal-resa').classList.add('open');
@@ -1350,6 +1414,14 @@ async function openClientModal(clientId) {
       <div class="info-row"><span class="k">Courriel</span><span class="v">${client.email||'—'}</span></div>
       <div class="info-row"><span class="k">Client depuis</span><span class="v">${client.created_at?.split('T')[0]||'—'}</span></div>
       <div class="info-row"><span class="k">Statut</span><span class="v">${client.est_bloque?'<span class="status-badge status-annulé">Bloqué</span>':'<span class="status-badge status-confirmé">Actif</span>'}</span></div>
+      ${(client.nb_absences||0)>0?`
+      <div class="info-row" style="background:rgba(231,76,60,0.05);border-left:3px solid var(--red)">
+        <span class="k" style="color:var(--red)">Absences</span>
+        <span class="v">
+          <span class="absence-badge">🚫 ${client.nb_absences} absence${client.nb_absences>1?'s':''}</span>
+          ${client.derniere_absence?`<span style="font-size:0.72rem;color:var(--dim2);margin-left:0.5rem">Dernière : ${client.derniere_absence}</span>`:''}
+        </span>
+      </div>`:''}
     </div>
 
     <div style="margin-bottom:1.5rem">
