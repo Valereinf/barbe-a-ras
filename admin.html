@@ -1090,6 +1090,15 @@ function initApp() {
   document.getElementById('today-label').textContent =
     now.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
   loadAll();
+  // Auto-refresh toutes les 60 secondes
+  setInterval(()=>{
+    loadAll();
+    // Recharger le calendrier si visible
+    if(document.getElementById('tab-calendrier')?.classList.contains('active')) {
+      const picker = document.getElementById('cal-date-picker');
+      if(picker?.value) loadCalendrier(picker.value);
+    }
+  }, 60000);
 }
 
 async function loadAll() {
@@ -1186,7 +1195,12 @@ function renderResa(data) {
       <td>${r.date_rdv||'—'}</td>
       <td>${r.heure_rdv?.substring(0,5)||'—'}</td>
       <td>
-        <div>${r.clients?.prenom||''} ${r.clients?.nom||''}</div>
+        <div>
+          ${r.clients?.prenom||''} ${r.clients?.nom||''}
+          ${r.barbier && r.barbier!=='Sans préférence'
+            ? '<span title="A choisi son barbier" style="margin-left:4px;font-size:0.85rem">❤️</span>'
+            : ''}
+        </div>
         <div style="font-size:0.75rem;color:var(--dim2)">${r.clients?.telephone||''}</div>
       </td>
       <td style="max-width:180px;font-size:0.82rem">${r.service||'—'}</td>
@@ -1834,10 +1848,12 @@ async function openResaByTime(dateStr, heure) {
 // ═══════════════════════════════════════════
 // MODIFIER RDV (Admin)
 // ═══════════════════════════════════════════
-function openEditResaModal(id) {
+async function openEditResaModal(id) {
   const resa = allResa.find(r=>r.id===id);
   if(!resa) return;
   document.getElementById('edit-resa-id').value = id;
+  // S'assurer que le select est peuplé
+  await populateBarbierSelects();
   document.getElementById('edit-resa-barbier').value = resa.barbier||'Barbara Sandra';
   document.getElementById('edit-resa-service').value = resa.service||'Coupe de cheveux adulte';
   document.getElementById('edit-resa-prix').value = resa.prix||'';
@@ -2435,7 +2451,7 @@ async function toggleCollabActif(id, actuel) {
 async function populateBarbierSelects() {
   const collabs = await loadCollabs(true);
   const opts = collabs.map(c=>`<option value="${c.nom}">${c.nom}</option>`).join('');
-  ['modal-barbier','create-rdv-barbier','wl-barbier-filter','modal-modif-barbier'].forEach(id => {
+  ['modal-barbier','create-rdv-barbier','wl-barbier-filter','modal-modif-barbier','edit-resa-barbier'].forEach(id => {
     const el = document.getElementById(id);
     if(el) { const val=el.value; el.innerHTML=opts; el.value=val||''; }
   });
