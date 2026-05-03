@@ -500,11 +500,12 @@ async function loadBookingCollabs(){
       const initials=c.nom.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
       const card=document.createElement('div');
       card.className='barber-card';
+      const roleLabel = c.genre==='feminin' ? 'Barbière' : 'Barbier';
       card.innerHTML=`
         ${c.photo_url?`<img src="${c.photo_url}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid ${c.couleur}44">`:
           `<div class="barber-avatar" style="background:${c.couleur}22;color:${c.couleur};border:2px solid ${c.couleur}44">${initials}</div>`}
         <span class="barber-name">${c.nom}</span>
-        <span class="barber-role">Barbier·ère</span>`;
+        <span class="barber-role">${roleLabel}</span>`;
       card.onclick=()=>selBarber(card,c.nom);
       grid.appendChild(card);
     });
