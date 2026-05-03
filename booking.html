@@ -444,8 +444,13 @@ let _bookingCollabs=[];
 
 async function loadBookingCollabs(){
   if(_bookingCollabs.length) return _bookingCollabs;
-  const {data}=await sb.from('collaborateurs').select('*').eq('actif',true).order('ordre').order('nom');
-  _bookingCollabs=data||[];
+  try {
+    const {data}=await sb.from('collaborateurs').select('*').eq('actif',true).order('ordre').order('nom');
+    _bookingCollabs=data||[];
+  } catch(e) {
+    // Fallback si table absente
+    _bookingCollabs=[{nom:'Barbara Sandra',couleur:'#C9A84C',photo_url:''},{nom:'Michael',couleur:'#4A90D9',photo_url:''}];
+  }
   const grid=document.querySelector('.barber-grid');
   if(grid){
     _bookingCollabs.forEach(c=>{
@@ -541,26 +546,46 @@ function toTime(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%
 let _horairesSalon = null;
 let _horairesCollab = null;
 
+// Fallback salon si Supabase vide/erreur
+const FALLBACK_SALON = [
+  {dow:0,ouvert:false},{dow:1,ouvert:false},
+  {dow:2,ouvert:true,debut:'09:00',fin:'17:00'},
+  {dow:3,ouvert:true,debut:'09:00',fin:'17:00'},
+  {dow:4,ouvert:true,debut:'09:00',fin:'20:00'},
+  {dow:5,ouvert:true,debut:'09:00',fin:'20:00'},
+  {dow:6,ouvert:true,debut:'08:00',fin:'12:00'},
+];
+
 async function ensureHoraires() {
   if(_horairesSalon && _horairesCollab) return;
-  const [salonResp, collabResp] = await Promise.all([
-    sb.from('horaires_salon').select('*').order('dow'),
-    sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
-  ]);
-  if(salonResp.data && salonResp.data.length===7) {
-    _horairesSalon = salonResp.data.map(r=>({...r, dow:parseInt(r.dow)}));
-  } else {
-    _horairesSalon = null;
-  }
-  if(collabResp.data && collabResp.data.length>=14) {
-    _horairesCollab = {};
-    for(const r of collabResp.data) {
-      if(!_horairesCollab[r.barbier]) _horairesCollab[r.barbier]=[];
-      // S'assurer que pauses est un tableau (Supabase JSONB peut arriver en string)
-      r.pauses = typeof r.pauses === 'string' ? JSON.parse(r.pauses) : (r.pauses || []);
-      r.dow = parseInt(r.dow);
-      _horairesCollab[r.barbier].push(r);
+  try {
+    const [salonResp, collabResp] = await Promise.all([
+      sb.from('horaires_salon').select('*').order('dow'),
+      sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
+    ]);
+    // Salon
+    if(salonResp.data && salonResp.data.length > 0) {
+      _horairesSalon = salonResp.data.map(r=>({...r, dow:parseInt(r.dow)}));
+    } else {
+      _horairesSalon = FALLBACK_SALON;
     }
+    // Collab
+    if(collabResp.data && collabResp.data.length > 0) {
+      _horairesCollab = {};
+      for(const r of collabResp.data) {
+        if(!_horairesCollab[r.barbier]) _horairesCollab[r.barbier]=[];
+        r.pauses = typeof r.pauses === 'string' ? JSON.parse(r.pauses) : (r.pauses || []);
+        r.dow = parseInt(r.dow);
+        _horairesCollab[r.barbier].push(r);
+      }
+    } else {
+      _horairesCollab = {};
+    }
+  } catch(e) {
+    // En cas d'erreur réseau, utiliser le fallback
+    console.warn('Horaires Supabase inaccessibles, fallback utilisé');
+    _horairesSalon = FALLBACK_SALON;
+    _horairesCollab = {};
   }
 }
 
