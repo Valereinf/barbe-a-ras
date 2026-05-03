@@ -586,6 +586,22 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
     </div>
     <div class="modal-body">
       <input type="hidden" id="edit-client-id">
+      <input type="hidden" id="edit-client-photo">
+      <!-- Photo client -->
+      <div class="field">
+        <label>Photo</label>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:0.4rem">
+          <div style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:var(--black);border:2px solid var(--gold4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            <img id="edit-client-photo-img" style="width:100%;height:100%;object-fit:cover;display:none">
+            <span id="edit-client-photo-placeholder" style="font-size:1.3rem;color:var(--dim2)">👤</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;flex:1">
+            <input type="file" id="edit-client-photo-file" accept="image/*" style="display:none" onchange="handleClientPhotoUpload(this)">
+            <button type="button" onclick="document.getElementById('edit-client-photo-file').click()" style="background:transparent;border:1px solid var(--gold4);color:var(--gold);padding:0.4rem 0.8rem;font-size:0.75rem;letter-spacing:1px;cursor:pointer;text-align:left">📁 Choisir une photo...</button>
+            <button type="button" id="edit-client-photo-remove" onclick="removeClientPhoto()" style="display:none;background:transparent;border:1px solid rgba(231,76,60,0.4);color:var(--red);padding:0.3rem 0.8rem;font-size:0.75rem;cursor:pointer;text-align:left">✕ Supprimer</button>
+          </div>
+        </div>
+      </div>
       <div class="field"><label>Prénom</label><input type="text" id="edit-client-prenom"></div>
       <div class="field"><label>Nom</label><input type="text" id="edit-client-nom"></div>
       <div class="field"><label>Téléphone</label><input type="tel" id="edit-client-tel"></div>
@@ -999,7 +1015,10 @@ function renderClients(data) {
         ?'<span class="status-badge status-annulé">Bloqué</span>'
         :'<span class="status-badge status-confirmé">Actif</span>'}</td>
       <td style="white-space:nowrap">
-        <button class="btn-sm btn-info" style="margin-right:4px" onclick="openClientModal('${c.id}')">Fiche</button>
+        <button class="btn-sm btn-info" style="margin-right:4px;display:inline-flex;align-items:center;gap:0.4rem" onclick="openClientModal('${c.id}')">
+          ${c.photo_url?`<img src="${c.photo_url}" style="width:18px;height:18px;border-radius:50%;object-fit:cover">`:'👤'}
+          Fiche
+        </button>
         ${c.est_bloque
           ?`<button class="btn-sm btn-success" onclick="unblockClient('${c.id}')">Débloquer</button>`
           :`<button class="btn-sm btn-danger" onclick="openBlockModal('${c.id}','${c.prenom} ${c.nom}')">Bloquer</button>`}
@@ -1159,6 +1178,17 @@ async function openClientModal(clientId) {
 
   document.getElementById('modal-client-name').textContent = `${client.prenom} ${client.nom}`;
   document.getElementById('modal-client-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--gold4)">
+      <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--charcoal);border:2px solid var(--gold4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        ${client.photo_url
+          ? `<img src="${client.photo_url}" style="width:100%;height:100%;object-fit:cover">`
+          : `<span style="font-size:1.5rem;color:var(--dim2)">${(client.prenom||'?')[0].toUpperCase()}</span>`}
+      </div>
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--gold)">${client.prenom} ${client.nom}</div>
+        <div style="font-size:0.78rem;color:var(--dim2)">${client.telephone||'—'} · ${client.email||'Pas de courriel'}</div>
+      </div>
+    </div>
     <div style="margin-bottom:1.5rem">
       <div class="info-row"><span class="k">Prénom</span><span class="v">${client.prenom}</span></div>
       <div class="info-row"><span class="k">Nom</span><span class="v">${client.nom}</span></div>
@@ -1516,14 +1546,54 @@ async function notifyResaModif(id, client, newDate, newHeure, barbier, service) 
 // ═══════════════════════════════════════════
 // MODIFIER CLIENT (Admin)
 // ═══════════════════════════════════════════
+function handleClientPhotoUpload(input) {
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024) { showToast('Photo trop grande — max 2MB','error'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result;
+    document.getElementById('edit-client-photo').value = b64;
+    document.getElementById('edit-client-photo-img').src = b64;
+    document.getElementById('edit-client-photo-img').style.display = 'block';
+    document.getElementById('edit-client-photo-placeholder').style.display = 'none';
+    document.getElementById('edit-client-photo-remove').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeClientPhoto() {
+  document.getElementById('edit-client-photo').value = '';
+  document.getElementById('edit-client-photo-img').src = '';
+  document.getElementById('edit-client-photo-img').style.display = 'none';
+  document.getElementById('edit-client-photo-placeholder').style.display = 'block';
+  document.getElementById('edit-client-photo-remove').style.display = 'none';
+  document.getElementById('edit-client-photo-file').value = '';
+}
+
+function resetClientPhotoUI(photoUrl) {
+  if(photoUrl) {
+    document.getElementById('edit-client-photo-img').src = photoUrl;
+    document.getElementById('edit-client-photo-img').style.display = 'block';
+    document.getElementById('edit-client-photo-placeholder').style.display = 'none';
+    document.getElementById('edit-client-photo-remove').style.display = 'block';
+  } else {
+    document.getElementById('edit-client-photo-img').style.display = 'none';
+    document.getElementById('edit-client-photo-placeholder').style.display = 'block';
+    document.getElementById('edit-client-photo-remove').style.display = 'none';
+  }
+}
+
 function openEditClientModal(clientId) {
   const client = allClients.find(c=>c.id===clientId);
   if(!client) return;
   document.getElementById('edit-client-id').value = clientId;
+  document.getElementById('edit-client-photo').value = client.photo_url||'';
   document.getElementById('edit-client-prenom').value = client.prenom||'';
   document.getElementById('edit-client-nom').value = client.nom||'';
   document.getElementById('edit-client-tel').value = client.telephone||'';
   document.getElementById('edit-client-email').value = client.email||'';
+  resetClientPhotoUI(client.photo_url||'');
   closeModal('modal-client');
   document.getElementById('modal-edit-client').classList.add('open');
 }
@@ -1535,8 +1605,10 @@ async function saveClientEdit() {
   const tel = document.getElementById('edit-client-tel').value.trim();
   const email = document.getElementById('edit-client-email').value.trim();
   if(!prenom||!nom){showToast('Prénom et nom requis','err');return;}
+  const photo = document.getElementById('edit-client-photo').value;
   await sb.from('clients').update({
-    prenom, nom, telephone:tel.replace(/\D/g,''), email:email||null
+    prenom, nom, telephone:tel.replace(/\D/g,''), email:email||null,
+    photo_url: photo||null
   }).eq('id',id);
   showToast('Fiche client modifiée ✅','ok');
   closeModal('modal-edit-client');
@@ -1693,12 +1765,22 @@ async function saveNewResa() {
 
   let clientId = newResaClientId;
   if(!clientId) {
-    const {data:nc} = await sb.from('clients')
-      .insert({prenom,nom,telephone:tel,email:email||null})
-      .select('id').single();
-    clientId = nc?.id;
+    // 1. Chercher si le client existe déjà par téléphone
+    if(tel) {
+      const {data:existing} = await sb.from('clients')
+        .select('id').eq('telephone', tel).maybeSingle();
+      clientId = existing?.id || null;
+    }
+    // 2. Si pas trouvé, créer le client
+    if(!clientId) {
+      const {data:nc, error:ce} = await sb.from('clients')
+        .insert({prenom, nom, telephone: tel||null, email: email||null})
+        .select('id').single();
+      if(ce) { showToast('Erreur création client : ' + ce.message, 'error'); return; }
+      clientId = nc?.id;
+    }
   }
-  if(!clientId){showToast('Erreur création client','err');return;}
+  if(!clientId){ showToast('Impossible de créer ou retrouver le client', 'error'); return; }
 
   await sb.from('reservations').insert({
     client_id:clientId, barbier, service, prix,
