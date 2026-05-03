@@ -510,6 +510,33 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 </div>
 
 
+<!-- MODAL: CONFIRMATION ABSENT -->
+<div id="modal-absent" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1100;align-items:center;justify-content:center">
+  <div style="background:var(--charcoal);border:2px solid var(--red);max-width:420px;width:90%;padding:2rem">
+    <input type="hidden" id="modal-absent-resa-id">
+    <input type="hidden" id="modal-absent-client-id">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div style="font-size:2.5rem;margin-bottom:0.8rem">🚫</div>
+      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px;color:var(--red)">MARQUER ABSENT</h3>
+      <p style="font-size:0.85rem;color:var(--dim);line-height:1.6;margin-top:0.8rem">
+        Cette action va enregistrer l'absence du client, incrémenter son compteur d'absences et lui envoyer une <strong style="color:var(--white)">notification de pénalité</strong> par email et SMS.
+      </p>
+      <div style="background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.3);padding:0.8rem;margin-top:1rem;font-size:0.8rem;color:rgba(245,240,232,0.7)">
+        💸 Frais applicables au prochain RDV :<br>
+        <strong style="color:var(--white)">Coupe seule : 19,50 $ · Coupe + barbe : 35,00 $</strong>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.8rem">
+      <button onclick="confirmerAbsent()" style="flex:1;background:var(--red);color:var(--white);border:none;padding:0.9rem;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;cursor:pointer">
+        ✓ CONFIRMER L'ABSENCE
+      </button>
+      <button onclick="document.getElementById('modal-absent').style.display='none'" style="background:transparent;border:1px solid var(--gold4);color:var(--dim2);padding:0.9rem 1.2rem;font-size:0.85rem;cursor:pointer">
+        Annuler
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: EXCEPTION HORAIRE -->
 <div id="modal-exception" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center">
   <div style="background:var(--charcoal);border:1px solid rgba(231,76,60,0.4);max-width:460px;width:90%;padding:2rem;max-height:90vh;overflow-y:auto">
@@ -1255,8 +1282,17 @@ function searchClients(q) {
 // ═══════════════════════════════════════════
 // RESERVATION ACTIONS
 // ═══════════════════════════════════════════
-async function marquerAbsent(resaId, clientId) {
-  if(!confirm('Marquer ce client comme absent et lui envoyer une notification de pénalité ?')) return;
+function marquerAbsent(resaId, clientId) {
+  // Ouvrir le modal de confirmation custom
+  document.getElementById('modal-absent-resa-id').value = resaId;
+  document.getElementById('modal-absent-client-id').value = clientId;
+  document.getElementById('modal-absent').style.display = 'flex';
+}
+
+async function confirmerAbsent() {
+  const resaId   = document.getElementById('modal-absent-resa-id').value;
+  const clientId = document.getElementById('modal-absent-client-id').value;
+  document.getElementById('modal-absent').style.display = 'none';
 
   showOverlay("Enregistrement de l'absence...");
 
@@ -1308,7 +1344,7 @@ async function marquerAbsent(resaId, clientId) {
   hideOverlay();
   showToast('Absence enregistrée — notification envoyée ✓', 'ok');
   closeModal('modal-resa');
-  loadAll();
+  await loadAll();
 }
 
 async function cancelResa(id) {
