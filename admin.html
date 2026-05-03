@@ -471,11 +471,20 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         <input id="collab-nom" type="text" placeholder="Prénom Nom" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.6rem 0.8rem;font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none;margin-top:0.3rem">
       </div>
       <div>
-        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Photo (URL)</label>
-        <input id="collab-photo" type="text" placeholder="https://... ou laisser vide" style="width:100%;background:var(--black);border:1px solid var(--gold4);color:var(--white);padding:0.6rem 0.8rem;font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none;margin-top:0.3rem">
-        <div id="collab-photo-preview" style="margin-top:0.5rem;display:none">
-          <img id="collab-photo-img" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--gold4)">
+        <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Photo</label>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:0.5rem">
+          <div id="collab-photo-preview" style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--black);border:2px solid var(--gold4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            <img id="collab-photo-img" style="width:100%;height:100%;object-fit:cover;display:none">
+            <span id="collab-photo-placeholder" style="font-size:1.4rem;color:var(--dim2)">👤</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;flex:1">
+            <input type="file" id="collab-photo-file" accept="image/*" style="display:none" onchange="handlePhotoUpload(this)">
+            <button type="button" onclick="document.getElementById('collab-photo-file').click()" style="background:transparent;border:1px solid var(--gold4);color:var(--gold);padding:0.5rem 1rem;font-size:0.78rem;letter-spacing:1px;cursor:pointer;text-align:left">📁 Choisir une photo...</button>
+            <button type="button" id="collab-photo-remove" onclick="removePhoto()" style="display:none;background:transparent;border:1px solid rgba(231,76,60,0.4);color:var(--red);padding:0.4rem 1rem;font-size:0.75rem;letter-spacing:1px;cursor:pointer;text-align:left">✕ Supprimer la photo</button>
+            <span id="collab-photo-name" style="font-size:0.72rem;color:var(--dim2)">Aucune photo sélectionnée</span>
+          </div>
         </div>
+        <input type="hidden" id="collab-photo">
       </div>
       <div>
         <label style="font-size:0.75rem;letter-spacing:1px;color:var(--dim2);text-transform:uppercase">Couleur dans le calendrier</label>
@@ -1751,16 +1760,59 @@ function renderCollabsList(list) {
     </div>`).join('');
 }
 
+function handlePhotoUpload(input) {
+  const file = input.files[0];
+  if(!file) return;
+  // Limiter à 2MB
+  if(file.size > 2*1024*1024) { showToast('Photo trop grande — max 2MB','error'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result; // data:image/...;base64,...
+    document.getElementById('collab-photo').value = b64;
+    document.getElementById('collab-photo-img').src = b64;
+    document.getElementById('collab-photo-img').style.display = 'block';
+    document.getElementById('collab-photo-placeholder').style.display = 'none';
+    document.getElementById('collab-photo-remove').style.display = 'block';
+    document.getElementById('collab-photo-name').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto() {
+  document.getElementById('collab-photo').value = '';
+  document.getElementById('collab-photo-img').src = '';
+  document.getElementById('collab-photo-img').style.display = 'none';
+  document.getElementById('collab-photo-placeholder').style.display = 'block';
+  document.getElementById('collab-photo-remove').style.display = 'none';
+  document.getElementById('collab-photo-name').textContent = 'Aucune photo sélectionnée';
+  document.getElementById('collab-photo-file').value = '';
+}
+
+function resetPhotoUI(photoUrl) {
+  if(photoUrl) {
+    document.getElementById('collab-photo-img').src = photoUrl;
+    document.getElementById('collab-photo-img').style.display = 'block';
+    document.getElementById('collab-photo-placeholder').style.display = 'none';
+    document.getElementById('collab-photo-remove').style.display = 'block';
+    document.getElementById('collab-photo-name').textContent = 'Photo enregistrée';
+  } else {
+    document.getElementById('collab-photo-img').style.display = 'none';
+    document.getElementById('collab-photo-placeholder').style.display = 'block';
+    document.getElementById('collab-photo-remove').style.display = 'none';
+    document.getElementById('collab-photo-name').textContent = 'Aucune photo sélectionnée';
+  }
+}
+
 function showAddCollabModal() {
   document.getElementById('modal-collab-title').textContent = 'NOUVEAU COLLABORATEUR';
   document.getElementById('collab-nom').value = '';
   document.getElementById('collab-photo').value = '';
-  document.getElementById('collab-photo-preview').style.display = 'none';
   document.getElementById('collab-edit-id').value = '';
   document.getElementById('collab-actif-toggle').checked = true;
   document.getElementById('collab-couleur-val').value = '#C9A84C';
   document.querySelectorAll('.couleur-opt').forEach(o=>o.style.borderColor='transparent');
   document.querySelector('.couleur-opt[data-c="#C9A84C"]').style.borderColor = '#fff';
+  resetPhotoUI('');
   document.getElementById('modal-collab').style.display = 'flex';
 }
 
@@ -1773,12 +1825,7 @@ async function editCollab(id) {
   document.getElementById('collab-edit-id').value = data.id;
   document.getElementById('collab-actif-toggle').checked = data.actif;
   document.getElementById('collab-couleur-val').value = data.couleur||'#C9A84C';
-  if(data.photo_url) {
-    document.getElementById('collab-photo-img').src = data.photo_url;
-    document.getElementById('collab-photo-preview').style.display = 'block';
-  } else {
-    document.getElementById('collab-photo-preview').style.display = 'none';
-  }
+  resetPhotoUI(data.photo_url||'');
   document.querySelectorAll('.couleur-opt').forEach(o => {
     o.style.borderColor = o.dataset.c === data.couleur ? '#fff' : 'transparent';
   });
