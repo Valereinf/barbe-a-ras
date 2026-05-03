@@ -225,9 +225,26 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
   text-transform:uppercase;margin-bottom:0.3rem}
 .note-entry .txt{color:var(--dim);line-height:1.5}
 
+/* HAMBURGER */
+.hamburger{display:none;background:none;border:1px solid var(--gold4);color:var(--gold);
+  width:40px;height:40px;cursor:pointer;font-size:1.2rem;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all 0.2s}
+.hamburger:hover{background:var(--gold3)}
+.drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500}
+.drawer-overlay.open{display:block}
+.drawer{position:fixed;top:0;left:-240px;width:240px;height:100vh;background:var(--dark);
+  border-right:1px solid var(--gold4);z-index:501;transition:left 0.25s ease;overflow-y:auto}
+.drawer.open{left:0}
+.drawer-head{padding:1.2rem 1.4rem;border-bottom:1px solid var(--gold4);display:flex;
+  align-items:center;justify-content:space-between}
+.drawer-head h2{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:3px;color:var(--gold)}
+.drawer-close{background:none;border:none;color:var(--dim2);font-size:1.3rem;cursor:pointer}
+
 @media(max-width:768px){
   .sidebar{display:none}
+  .hamburger{display:flex}
   .stats-row{grid-template-columns:1fr 1fr}
+  .topbar{padding:0 1rem}
 }
 </style>
 </head>
@@ -248,9 +265,21 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 
 <!-- APP -->
 <div class="app" id="app">
+
+  <!-- DRAWER MOBILE -->
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-head">
+      <h2>✂ MENU</h2>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div id="drawer-nav"></div>
+  </div>
+
   <div class="topbar">
     <h1>✂ BARBE-À-RAS <span style="color:var(--dim2);font-size:0.9rem;letter-spacing:1px"> · ADMIN</span></h1>
     <div class="topbar-right">
+      <button class="hamburger" onclick="openDrawer()" title="Menu">☰</button>
       <span style="font-size:0.75rem;color:var(--dim2)" id="today-label"></span>
       <span class="badge" id="waitlist-badge" style="display:none">0</span>
       <button class="logout" onclick="doLogout()">Déconnexion</button>
@@ -1488,6 +1517,41 @@ async function removeWaitlist(id) {
 // ═══════════════════════════════════════════
 // UI UTILS
 // ═══════════════════════════════════════════
+function openDrawer() {
+  // Cloner les nav items de la sidebar dans le drawer
+  const drawerNav = document.getElementById('drawer-nav');
+  const sidebar = document.querySelector('.sidebar');
+  if(sidebar && drawerNav) {
+    drawerNav.innerHTML = sidebar.innerHTML;
+    // Rebinder les clics pour fermer le drawer après navigation
+    drawerNav.querySelectorAll('.nav-item').forEach(item => {
+      const onclick = item.getAttribute('onclick');
+      if(onclick) {
+        item.setAttribute('onclick', onclick.replace('showTab(', 'showTab(') + ';closeDrawer()');
+        // Réécrire proprement
+        const match = onclick.match(/showTab\('([^']+)'\)/);
+        if(match) {
+          item.onclick = () => { showTab(match[1]); closeDrawer(); };
+        }
+      }
+    });
+    // Marquer l'item actif
+    drawerNav.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const activeName = document.querySelector('.nav-item.active')?.id?.replace('nav-','');
+    if(activeName) {
+      const activeInDrawer = drawerNav.querySelector(`[id="nav-${activeName}"]`);
+      if(activeInDrawer) activeInDrawer.classList.add('active');
+    }
+  }
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
