@@ -1461,11 +1461,11 @@ async function openResaModal(id) {
     <button class="btn-sm btn-info" onclick="openEditResaModal('${id}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveStaffNote('${id}')">Sauvegarder la note</button>
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
-    ${resa.no_show!==true
-      ? `<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
-           onclick="marquerAbsent('${id}')">🚫 Absent</button>`
-      : `<button class="btn-sm" style="background:rgba(39,174,96,0.15);border:1px solid var(--green);color:var(--green);font-weight:700"
-           onclick="marquerAbsent('${id}')">✅ Annuler absent</button>`}
+    <button class="btn-sm" id="btn-absent-${id}"
+      style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
+      onclick="marquerAbsent('${id}')">
+      ${resa.no_show===true ? '✅ Annuler absent' : '🚫 Absent'}
+    </button>
   `;
 
   document.getElementById('modal-resa').classList.add('open');
