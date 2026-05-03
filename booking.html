@@ -563,10 +563,13 @@ async function ensureHoraires() {
       sb.from('horaires_salon').select('*').order('dow'),
       sb.from('horaires_collaborateurs').select('*').order('barbier').order('dow')
     ]);
+    console.log('[horaires] salon:', salonResp.data?.length, 'rows, error:', salonResp.error?.message);
+    console.log('[horaires] collab:', collabResp.data?.length, 'rows, error:', collabResp.error?.message);
     // Salon
     if(salonResp.data && salonResp.data.length > 0) {
       _horairesSalon = salonResp.data.map(r=>({...r, dow:parseInt(r.dow)}));
     } else {
+      console.warn('[horaires] salon vide ou erreur — fallback utilisé');
       _horairesSalon = FALLBACK_SALON;
     }
     // Collab
@@ -700,6 +703,7 @@ async function renderCal(){
   const days=new Date(S.year,S.month+1,0).getDate();
   const today=new Date();
   for(let i=0;i<first;i++){const e=document.createElement('div');e.className='cal-day empty';grid.appendChild(e);}
+  console.log('[renderCal] _horairesSalon:', _horairesSalon ? _horairesSalon.length+' entrées' : 'NULL');
   for(let d=1;d<=days;d++){
     const e=document.createElement('div');
     const dt=new Date(S.year,S.month,d);const dow=dt.getDay();
@@ -804,10 +808,9 @@ async function selDay(d,dt,el){
     }
     document.getElementById('time-sec').style.display='block';
   } else {
-    const isBlocked = S.barber==='Barbara Sandra' ? barbaraBlocked : michaelBlocked;
-    const busy = S.barber==='Barbara Sandra' ? busyB : busyM;
-    const blockedSlots = S.barber==='Barbara Sandra' ? blockedSlotsB : blockedSlotsM;
-    if(isBlocked){
+    // Barbier spécifique — utiliser collabData
+    const cd = collabData.find(c=>c.nom===S.barber);
+    if(!cd || cd.blocked){
       const indi=indis.find(i=>i.barbier===S.barber||i.barbier==='Tous');
       document.getElementById('time-grid').innerHTML=`
         <div style="grid-column:1/-1;padding:1.2rem;background:rgba(231,76,60,0.08);
@@ -817,7 +820,7 @@ async function selDay(d,dt,el){
         </div>`;
       document.getElementById('time-sec').style.display='block';return;
     }
-    const avail = getAvailableSlots(dt, busy, requestedDur, blockedSlots, S.barber);
+    const avail = getAvailableSlots(dt, cd.busy, requestedDur, cd.blockedSlots, S.barber);
     if(avail.length===0){document.getElementById('waitlist-banner').style.display='block';return;}
     const grid=document.getElementById('time-grid');grid.innerHTML='';
     const barberRange=getBarberDayRange(S.barber,dt);
