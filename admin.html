@@ -1326,12 +1326,16 @@ async function confirmerAbsent() {
   showOverlay("Enregistrement du No Show...");
 
   // Mettre no_show = true (on ne touche pas au statut)
-  const {error} = await sb.from('reservations').update({no_show: true}).eq('id', resaId);
-  if(error) { hideOverlay(); showToast('Erreur : '+error.message,'error'); return; }
+  const {data:updData, error} = await sb.from('reservations')
+    .update({no_show: true})
+    .eq('id', resaId)
+    .select('id,no_show,client_id')
+    .single();
 
-  // Récupérer client_id depuis Supabase
-  const {data:resaData} = await sb.from('reservations').select('client_id').eq('id',resaId).single();
-  const clientId = resaData?.client_id;
+  if(error) { hideOverlay(); showToast('Erreur Supabase : '+error.message,'error'); return; }
+  if(!updData) { hideOverlay(); showToast('Aucune ligne mise à jour — vérifiez que la colonne no_show existe dans Supabase','error'); return; }
+
+  const clientId = updData.client_id;
 
   // 2. Récupérer les infos du client
   const {data:client} = await sb.from('clients').select('*').eq('id',clientId).single();
