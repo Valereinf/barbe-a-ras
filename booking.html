@@ -325,7 +325,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
           </div>
           <div class="form-group">
             <label>Téléphone * <span style="font-size:0.65rem;color:var(--gold);letter-spacing:1px">(lien d'annulation envoyé par SMS)</span></label>
-            <input type="tel" id="f-tel" placeholder="418-555-0000" required oninput="chkForm()">
+            <input type="tel" id="f-tel" placeholder="418-555-0000" required oninput="chkForm()" onblur="checkClientAbsences()">
           </div>
           <div class="form-group">
             <label>Courriel <span class="opt-label">(optionnel — confirmation par courriel)</span></label>
@@ -362,6 +362,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
         <div id="blocked-msg" style="display:none;background:rgba(231,76,60,0.1);border:1px solid var(--red);padding:1rem;margin-top:1rem;font-size:0.85rem;color:var(--red)">
           ⛔ Ce compte est actuellement suspendu. Veuillez contacter le salon au (418) 612-2007.
         </div>
+        <div id="absence-warning" style="display:none;background:rgba(231,76,60,0.08);border-left:4px solid var(--red);padding:1rem 1.2rem;margin-top:1rem;font-size:0.83rem;color:var(--red);line-height:1.6"></div>
         <!-- Options avant finalisation -->
         <div id="booking-options" style="display:flex;flex-direction:column;gap:0.6rem;margin-top:1.5rem">
           <div style="font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Que souhaitez-vous faire ?</div>
@@ -974,6 +975,22 @@ function updSum(){
   document.getElementById('s-dt').textContent=ds;
 }
 
+async function checkClientAbsences(){
+  const tel = document.getElementById('f-tel').value.replace(/\D/g,'').slice(-10);
+  if(!tel || tel.length < 10) return;
+  const {data:clients} = await sb.from('clients').select('nb_absences,derniere_absence,est_bloque').eq('telephone',tel).maybeSingle();
+  const msg = document.getElementById('absence-warning');
+  if(!msg) return;
+  if(clients && (clients.nb_absences||0) > 0) {
+    msg.style.display = 'block';
+    msg.innerHTML = `⚠ <strong>Avertissement</strong> — Selon nos dossiers, vous n'avez pas honoré <strong>${clients.nb_absences} rendez-vous</strong> précédent${clients.nb_absences>1?'s':''} chez Barbe-À-Ras.
+      <br>Des <strong>frais de pénalité</strong> s'appliqueront si ce rendez-vous n'est pas honoré.
+      <br><span style="font-size:0.78rem;color:rgba(245,240,232,0.55);margin-top:0.3rem;display:block">Coupe seule : 19,50 $ + taxes · Coupe + barbe : 35,00 $ + taxes</span>`;
+  } else {
+    msg.style.display = 'none';
+  }
+}
+
 function chkForm(){
   const ok=document.getElementById('f-prenom').value.trim()&&document.getElementById('f-nom').value.trim()&&document.getElementById('f-tel').value.trim()&&document.getElementById('policy').checked;
   document.getElementById('b4').disabled=!ok;
@@ -993,6 +1010,18 @@ async function submitBooking(){
   const {data:clientsFound}=await sb.from('clients').select('id,est_bloque').eq('telephone',telClean);
   const existingClient = clientsFound && clientsFound.length > 0 ? clientsFound[0] : null;
   if(existingClient?.est_bloque){hideOverlay();document.getElementById('blocked-msg').style.display='block';document.getElementById('b4').disabled=true;return;}
+
+  // Avertissement absence si le client a des absences
+  if(existingClient && (existingClient.nb_absences||0) > 0) {
+    const absMsg = document.getElementById('absence-warning');
+    if(absMsg) {
+      absMsg.style.display='block';
+      absMsg.innerHTML=`<strong>⚠ Attention</strong> — Vous n'avez pas honoré ${existingClient.nb_absences} rendez-vous précédent${existingClient.nb_absences>1?'s':''}. 
+        Des frais de non-présentation seront exigibles lors de ce rendez-vous si vous ne vous présentez pas.<br>
+        <span style="font-size:0.78rem;color:rgba(245,240,232,0.6)">Coupe : 19,50 $ + taxes · Coupe + barbe : 35,00 $ + taxes</span>`;
+    }
+  }
+
   showOverlay('Enregistrement du rendez-vous...');
   let clientId=existingClient?.id;
   if(!clientId){
