@@ -384,7 +384,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
           <button class="filter-btn active" onclick="filterResa('all',this)">Toutes</button>
           <button class="filter-btn" onclick="filterResa('confirmé',this)">Confirmées</button>
           <button class="filter-btn" onclick="filterResa('annulé',this)">Annulées</button>
-          <button class="filter-btn" onclick="filterResaNoShow(this)" id="filter-noshow-btn" style="color:#ff6b6b;border-color:rgba(180,0,0,0.4)">🚫 No Show</button>
+          <button class="filter-btn" onclick="filterResaNoShow(this)" id="filter-noshow-btn" style="color:#ff6b6b;border-color:rgba(180,0,0,0.4)">🚫 Absents</button>
           <input type="date" id="filter-date" onchange="filterByDate(this.value)">
           <input class="search-input" type="text" placeholder="Chercher nom / service..." oninput="searchResa(this.value)">
         </div>
@@ -1301,21 +1301,20 @@ function searchClients(q) {
 // ═══════════════════════════════════════════
 // RESERVATION ACTIONS
 // ═══════════════════════════════════════════
-function marquerAbsent(resaId) {
-  marquerNoShow(resaId, true);
-}
-
-async function marquerNoShow(resaId, isNoShow) {
-  if(isNoShow) {
-    document.getElementById('modal-absent-resa-id').value = resaId;
-    document.getElementById('modal-absent').style.display = 'flex';
+async function marquerAbsent(resaId) {
+  // Vérifier l'état actuel
+  const resa = allResa.find(r=>r.id===resaId);
+  if(resa && resa.no_show) {
+    // Déjà absent — annuler
+    await sb.from('reservations').update({no_show: false}).eq('id', resaId);
+    showToast('Absence annulée ✓', 'ok');
+    closeModal('modal-resa');
+    loadAll();
     return;
   }
-  // Annuler no show directement
-  await sb.from('reservations').update({no_show: false}).eq('id', resaId);
-  showToast('No show annulé ✓', 'ok');
-  closeModal('modal-resa');
-  loadAll();
+  // Ouvrir le modal de confirmation
+  document.getElementById('modal-absent-resa-id').value = resaId;
+  document.getElementById('modal-absent').style.display = 'flex';
 }
 
 async function confirmerAbsent() {
@@ -1323,7 +1322,7 @@ async function confirmerAbsent() {
   document.getElementById('modal-absent').style.display = 'none';
   if(!resaId) { showToast('Erreur : ID manquant','error'); return; }
 
-  showOverlay("Enregistrement du No Show...");
+  showOverlay("Enregistrement de l'absence...");
 
   // Mettre no_show = true (on ne touche pas au statut)
   const {data:updData, error} = await sb.from('reservations')
@@ -1445,9 +1444,9 @@ async function openResaModal(id) {
     ${resa.statut==='confirmé'?`<button class="btn-sm btn-danger" onclick="cancelResa('${id}');closeModal('modal-resa')">Annuler le RDV</button>`:''}
     ${!resa.no_show
       ? `<button class="btn-sm" style="background:rgba(231,76,60,0.15);border:1px solid var(--red);color:var(--red);font-weight:700"
-           onclick="marquerNoShow('${id}',true)">🚫 Absent</button>`
+           onclick="marquerAbsent('${id}')">🚫 Absent</button>`
       : `<button class="btn-sm" style="background:rgba(39,174,96,0.15);border:1px solid var(--green);color:var(--green);font-weight:700"
-           onclick="marquerNoShow('${id}',false)">✅ Annuler absent</button>`}
+           onclick="marquerAbsent('${id}')">✅ Annuler absent</button>`}
   `;
 
   document.getElementById('modal-resa').classList.add('open');
