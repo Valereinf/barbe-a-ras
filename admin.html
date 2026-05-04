@@ -2307,7 +2307,7 @@ async function loadCalendrier(dateStr) {
   // Charger les réservations et indisponibilités pour tous les collaborateurs
   const [indiResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
-    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
+    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,no_show,groupe_id,clients(prenom,nom)')
       .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
   ]);
   const indis = indiResp.data||[];
@@ -2332,9 +2332,22 @@ async function loadCalendrier(dateStr) {
           if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
             const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
-            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')">
+            // ❤️ = client avait une préférence (on le sait si c'est pas "Sans préférence" dans allResa)
+            const resaFull = allResa.find(x=>x.id===r.id);
+            const hasPref = resaFull ? (resaFull.barbier && resaFull.barbier!=='Sans préférence') : true;
+            const isNoShow = r.no_show === true;
+            const isPeriodic = !!r.groupe_id;
+            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')" style="${isNoShow?'opacity:0.5;border-left:3px solid var(--red)':''}">
               <span class="slot-time">${t}</span>
-              <div class="slot-info"><div class="slot-name">${nom}</div><div class="slot-svc">${svc}</div></div>
+              <div class="slot-info">
+                <div class="slot-name">
+                  ${hasPref?'<span title="Préférence barbier" style="margin-right:3px">❤️</span>':''}
+                  ${nom}
+                  ${isPeriodic?'<span title="RDV périodique" style="margin-left:3px;font-size:0.7rem">🔁</span>':''}
+                  ${isNoShow?'<span title="Absent" style="margin-left:3px;font-size:0.7rem">🚫</span>':''}
+                </div>
+                <div class="slot-svc">${svc}</div>
+              </div>
               <span class="slot-badge">RDV</span></div>`;
           } else {
             return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')">
