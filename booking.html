@@ -1059,7 +1059,8 @@ async function submitBooking(){
     allPriceStr = allPrice.toFixed(2)+'$';
     const {data:resa,error:re}=await sb.from('reservations').insert({
       client_id:clientId,barbier:finalBarber,service:allSvcNames,prix:allPriceStr,
-      date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note
+      date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note,
+      avec_preference: S.barber!=='Sans préférence'
     }).select('id').single();
     if(re){hideOverlay();showToast('Erreur lors de la réservation. Réessayez.','error');return;}
     resaId = resa.id;
