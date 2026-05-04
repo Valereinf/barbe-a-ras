@@ -1090,15 +1090,53 @@ function initApp() {
   document.getElementById('today-label').textContent =
     now.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
   loadAll();
-  // Auto-refresh toutes les 60 secondes
+  initRealtime();
+}
+
+function initRealtime() {
+  // Supabase Realtime — écoute les changements en temps réel
+  sb.channel('admin-sync')
+    .on('postgres_changes', {event:'*', schema:'public', table:'reservations'}, payload => {
+      console.log('[Realtime] reservations changed:', payload.eventType);
+      loadReservations();
+      updateStats();
+      loadTodayList();
+      // Rafraîchir le calendrier si visible
+      if(document.getElementById('tab-calendrier')?.classList.contains('active')) {
+        const picker = document.getElementById('cal-date-picker');
+        if(picker?.value) loadCalendrier(picker.value);
+      }
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'clients'}, payload => {
+      console.log('[Realtime] clients changed:', payload.eventType);
+      loadClients();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'horaires_salon'}, payload => {
+      console.log('[Realtime] horaires_salon changed');
+      loadHorairesSalon();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'horaires_collaborateurs'}, payload => {
+      console.log('[Realtime] horaires_collab changed');
+      loadHorairesCollab();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'horaires_exceptions'}, payload => {
+      console.log('[Realtime] exceptions changed');
+      loadExceptions().then(()=>renderHorairesCollab());
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'liste_attente'}, payload => {
+      console.log('[Realtime] waitlist changed');
+      loadWaitlist();
+    })
+    .subscribe(status => {
+      console.log('[Realtime] status:', status);
+    });
+
+  // Fallback polling toutes les 30s si Realtime déconnecté
   setInterval(()=>{
-    loadAll();
-    // Recharger le calendrier si visible
-    if(document.getElementById('tab-calendrier')?.classList.contains('active')) {
-      const picker = document.getElementById('cal-date-picker');
-      if(picker?.value) loadCalendrier(picker.value);
-    }
-  }, 60000);
+    loadReservations();
+    updateStats();
+    loadTodayList();
+  }, 30000);
 }
 
 async function loadAll() {
