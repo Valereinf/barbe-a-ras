@@ -1335,6 +1335,62 @@ function addAnotherService(){
 // Charger les collaborateurs au démarrage
 loadBookingCollabs();
 
+// ═══════════════════════════════════════════
+// REALTIME — synchronisation en temps réel
+// ═══════════════════════════════════════════
+function initBookingRealtime() {
+  sb.channel('booking-sync')
+    .on('postgres_changes', {event:'*', schema:'public', table:'horaires_salon'}, () => {
+      // Vider le cache horaires — sera rechargé au prochain selDay
+      _horairesSalon = null;
+      _horairesCollab = null;
+      _horairesExceptions = {};
+      console.log('[Realtime] horaires salon mis à jour');
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'horaires_collaborateurs'}, () => {
+      _horairesSalon = null;
+      _horairesCollab = null;
+      _horairesExceptions = {};
+      console.log('[Realtime] horaires collab mis à jour');
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'horaires_exceptions'}, () => {
+      _horairesSalon = null;
+      _horairesCollab = null;
+      _horairesExceptions = {};
+      console.log('[Realtime] exceptions mises à jour');
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'collaborateurs'}, () => {
+      // Vider le cache collaborateurs
+      _bookingCollabs = [];
+      loadBookingCollabs();
+      console.log('[Realtime] collaborateurs mis à jour');
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'reservations'}, payload => {
+      // Si une date est sélectionnée et qu'une résa change sur ce jour → recharger les créneaux
+      if(S.date) {
+        const changedDate = payload.new?.date_rdv || payload.old?.date_rdv;
+        const selectedDate = S.date.toISOString().split('T')[0];
+        if(changedDate === selectedDate) {
+          console.log('[Realtime] réservation changée sur la date sélectionnée — rechargement créneaux');
+          // Revider le cache et recharger silencieusement
+          _horairesSalon = null;
+          _horairesCollab = null;
+          _horairesExceptions = {};
+          const calDay = document.querySelector('.cal-day.selected');
+          if(calDay && S.date) {
+            const d = S.date.getDate();
+            selDay(d, S.date, calDay);
+          }
+        }
+      }
+    })
+    .subscribe(status => {
+      console.log('[Realtime booking] status:', status);
+    });
+}
+
+initBookingRealtime();
+
 function resetAll(){
   S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
   document.querySelectorAll('.barber-card,.svc-item').forEach(c=>c.classList.remove('selected'));
