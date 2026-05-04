@@ -1198,7 +1198,7 @@ async function loadAll() {
 // ═══════════════════════════════════════════
 async function loadReservations() {
   const {data} = await sb.from('reservations')
-    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, no_show, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences,derniere_absence)')
+    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, no_show, avec_preference, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences,derniere_absence)')
     .order('date_rdv',{ascending:false})
     .order('heure_rdv',{ascending:true});
   allResa = data||[];
@@ -1281,7 +1281,7 @@ function renderResa(data) {
       <td>
         <div>
           ${r.clients?.prenom||''} ${r.clients?.nom||''}
-          ${r.barbier && r.barbier!=='Sans préférence'
+          ${r.avec_preference===true
             ? '<span title="A choisi son barbier" style="margin-left:4px;font-size:0.85rem">❤️</span>'
             : ''}
         </div>
@@ -2307,7 +2307,7 @@ async function loadCalendrier(dateStr) {
   // Charger les réservations et indisponibilités pour tous les collaborateurs
   const [indiResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
-    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,no_show,groupe_id,clients(prenom,nom)')
+    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,no_show,groupe_id,avec_preference,clients(prenom,nom)')
       .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
   ]);
   const indis = indiResp.data||[];
@@ -2333,8 +2333,8 @@ async function loadCalendrier(dateStr) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
             const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
             // ❤️ = client avait une préférence (on le sait si c'est pas "Sans préférence" dans allResa)
-            const resaFull = allResa.find(x=>x.id===r.id);
-            const hasPref = resaFull ? (resaFull.barbier && resaFull.barbier!=='Sans préférence') : true;
+            // avec_preference = true si le client a explicitement choisi ce barbier
+            const hasPref = r.avec_preference === true;
             const isNoShow = r.no_show === true;
             const isPeriodic = !!r.groupe_id;
             return `<div class="cal-slot booked" onclick="openResaById('${r.id}')" style="${isNoShow?'opacity:0.5;border-left:3px solid var(--red)':''}">
