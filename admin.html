@@ -234,6 +234,32 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
   text-transform:uppercase;margin-bottom:0.3rem}
 .note-entry .txt{color:var(--dim);line-height:1.5}
 
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+.stat-big{background:var(--charcoal);border:1px solid var(--gold4);padding:1.4rem;position:relative;overflow:hidden}
+.stat-big::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold)}
+.stat-big.red::before{background:var(--red)}
+.stat-big.green::before{background:var(--green)}
+.stat-big.blue::before{background:var(--blue)}
+.stat-big .sb-val{font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--gold);line-height:1}
+.stat-big.red .sb-val{color:var(--red)}
+.stat-big.green .sb-val{color:var(--green)}
+.stat-big.blue .sb-val{color:var(--blue)}
+.stat-big .sb-lbl{font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);margin-top:0.3rem}
+.stat-big .sb-sub{font-size:0.75rem;color:var(--dim2);margin-top:0.4rem}
+.chart-bar-wrap{margin-bottom:0.5rem}
+.chart-bar-label{display:flex;justify-content:space-between;font-size:0.75rem;color:var(--dim);margin-bottom:3px}
+.chart-bar-track{background:rgba(245,240,232,0.06);height:22px;position:relative;overflow:hidden}
+.chart-bar-fill{height:100%;background:var(--gold);transition:width 0.5s ease;display:flex;align-items:center;padding-left:8px;font-size:0.65rem;color:var(--black);font-weight:700;min-width:2px}
+.chart-bar-fill.blue{background:var(--blue)}
+.chart-bar-fill.green{background:var(--green)}
+.chart-bar-fill.red{background:var(--red)}
+.stats-section{background:var(--charcoal);border:1px solid var(--gold4);padding:1.4rem;margin-bottom:1.5rem}
+.stats-section h3{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold);margin-bottom:1.2rem;padding-bottom:0.6rem;border-bottom:1px solid var(--gold4)}
+.period-btn{padding:0.4rem 0.9rem;background:var(--gold3);border:1px solid var(--gold4);color:var(--dim);font-size:0.7rem;letter-spacing:1px;cursor:pointer;transition:all 0.2s;text-transform:uppercase}
+.period-btn.active{background:var(--gold);color:var(--black);border-color:var(--gold)}
+.client-row{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid rgba(201,168,76,0.07);font-size:0.83rem}
+.client-row:last-child{border-bottom:none}
 /* HAMBURGER */
 .hamburger{display:none;background:none;border:1px solid var(--gold4);color:var(--gold);
   width:40px;height:40px;cursor:pointer;font-size:1.2rem;align-items:center;justify-content:center;
@@ -327,6 +353,9 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       </div>
       <div class="nav-item" onclick="showTab('heures-collab')" id="nav-heures-collab">
         <span class="ico">👥</span>Heures collab.
+      </div>
+      <div class="nav-item" onclick="showTab('stats')" id="nav-stats">
+        <span class="ico">📈</span>Statistiques
       </div>
     </div>
 
@@ -508,6 +537,22 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
             <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--gold);margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gold4)">Michael</div>
             <div id="collab-michael-grid"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- TAB: STATISTIQUES -->
+      <div class="tab" id="tab-stats">
+        <div class="sec-head">
+          <h2>Statistiques <span>du salon</span></h2>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="period-btn active" onclick="setPeriod('month',this)">Ce mois</button>
+            <button class="period-btn" onclick="setPeriod('3months',this)">3 mois</button>
+            <button class="period-btn" onclick="setPeriod('year',this)">Cette année</button>
+            <button class="period-btn" onclick="setPeriod('all',this)">Tout</button>
+          </div>
+        </div>
+        <div id="stats-content">
+          <div class="empty">Chargement des statistiques...</div>
         </div>
       </div>
 
@@ -1774,9 +1819,338 @@ function showTab(name) {
   if(name==='heures-collab') { loadHorairesCollab(); loadExceptions().then(()=>renderHorairesCollab()); }
   if(name==='collaborateurs') loadCollabsTab();
   if(name==='calendrier') { loadCalendrier(); return; }
+  if(name==='stats') { loadStats(); return; }
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='calendrier') loadCalendrier();
   if(name==='horaires') loadIndisponibilites();
+}
+
+// ═══════════════════════════════════════════
+// STATISTIQUES
+// ═══════════════════════════════════════════
+let _statsPeriod = 'month';
+
+function setPeriod(period, btn) {
+  _statsPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  loadStats();
+}
+
+function getDateRange() {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  let from;
+  if(_statsPeriod==='month') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  } else if(_statsPeriod==='3months') {
+    const d = new Date(now); d.setMonth(d.getMonth()-3);
+    from = d.toISOString().split('T')[0];
+  } else if(_statsPeriod==='year') {
+    from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+  } else {
+    from = '2020-01-01';
+  }
+  return {from, to: today};
+}
+
+function getPeriodLabel() {
+  const labels = {month:'Ce mois-ci', '3months':'3 derniers mois', year:'Cette année', all:'Depuis le début'};
+  return labels[_statsPeriod];
+}
+
+async function loadStats() {
+  document.getElementById('nav-stats').classList.add('active');
+  document.getElementById('stats-content').innerHTML = '<div class="empty">Chargement...</div>';
+
+  const {from, to} = getDateRange();
+
+  // Charger toutes les réservations de la période + toutes pour calculs historiques
+  const [{data:resasPeriod}, {data:resasAll}, {data:clients}] = await Promise.all([
+    sb.from('reservations')
+      .select('id,date_rdv,heure_rdv,barbier,service,prix,statut,no_show,client_id')
+      .gte('date_rdv', from).lte('date_rdv', to).eq('statut','confirmé'),
+    sb.from('reservations')
+      .select('id,date_rdv,heure_rdv,barbier,service,prix,statut,no_show,client_id'),
+    sb.from('clients').select('id,prenom,nom,created_at,nb_absences,derniere_absence')
+  ]);
+
+  const resas = resasPeriod || [];
+  const allResas = resasAll || [];
+  const allClts = clients || [];
+
+  renderStats(resas, allResas, allClts, from, to);
+}
+
+function parsePrice(prix) {
+  if(!prix) return 0;
+  return parseFloat(prix.replace(/[^0-9.]/g,'')) || 0;
+}
+
+function renderStats(resas, allResas, allClts, from, to) {
+  // ── CALCULS ──
+  const totalRDV = resas.length;
+  const revenu = resas.reduce((s,r)=>s+parsePrice(r.prix),0);
+  const absences = resas.filter(r=>r.no_show===true).length;
+
+  // RDV par barbier
+  const parBarbier = {};
+  const revParBarbier = {};
+  resas.forEach(r=>{
+    parBarbier[r.barbier] = (parBarbier[r.barbier]||0)+1;
+    revParBarbier[r.barbier] = (revParBarbier[r.barbier]||0)+parsePrice(r.prix);
+  });
+
+  // Heures les plus occupées
+  const parHeure = {};
+  resas.forEach(r=>{
+    const h = r.heure_rdv?.substring(0,2)+'h';
+    parHeure[h] = (parHeure[h]||0)+1;
+  });
+  const heuresSorted = Object.entries(parHeure).sort((a,b)=>b[1]-a[1]);
+
+  // Services populaires
+  const parService = {};
+  resas.forEach(r=>{
+    const svcs = r.service?.split(' + ')||[r.service||'—'];
+    svcs.forEach(s=>{
+      s = s.trim();
+      parService[s] = (parService[s]||0)+1;
+    });
+  });
+  const servicesSorted = Object.entries(parService).sort((a,b)=>b[1]-a[1]);
+
+  // RDV par jour de la semaine
+  const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  const parJour = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+  resas.forEach(r=>{
+    if(r.date_rdv) { const dow=new Date(r.date_rdv+'T12:00:00').getDay(); parJour[dow]++; }
+  });
+
+  // Clients réguliers vs perdus
+  const clientCounts = {};
+  allResas.filter(r=>r.statut==='confirmé').forEach(r=>{
+    if(r.client_id) clientCounts[r.client_id] = (clientCounts[r.client_id]||0)+1;
+  });
+  const reguliers = Object.values(clientCounts).filter(c=>c>=3).length;
+  const occasionnels = Object.values(clientCounts).filter(c=>c===2).length;
+  const uneFois = Object.values(clientCounts).filter(c=>c===1).length;
+
+  // Clients "perdus" — n'ont pas eu de RDV depuis 60 jours
+  const today = new Date();
+  const derniereVisite = {};
+  allResas.filter(r=>r.statut==='confirmé').forEach(r=>{
+    if(!r.client_id) return;
+    if(!derniereVisite[r.client_id] || r.date_rdv > derniereVisite[r.client_id])
+      derniereVisite[r.client_id] = r.date_rdv;
+  });
+  const perdus = Object.values(derniereVisite).filter(d=>{
+    const diff = (today - new Date(d+'T12:00:00')) / (1000*60*60*24);
+    return diff > 60;
+  }).length;
+
+  // Revenu moyen par RDV
+  const revMoyen = totalRDV > 0 ? (revenu/totalRDV).toFixed(2) : 0;
+
+  // RDV par mois (12 derniers mois)
+  const parMois = {};
+  const revParMois = {};
+  for(let i=11;i>=0;i--){
+    const d=new Date(); d.setMonth(d.getMonth()-i);
+    const key=d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    parMois[key]=0; revParMois[key]=0;
+  }
+  allResas.filter(r=>r.statut==='confirmé').forEach(r=>{
+    if(!r.date_rdv) return;
+    const key=r.date_rdv.substring(0,7);
+    if(parMois[key]!==undefined){ parMois[key]++; revParMois[key]+=parsePrice(r.prix); }
+  });
+
+  const maxBar = v => Math.max(...Object.values(v),1);
+
+  function bars(data, maxVal, colorClass='') {
+    return Object.entries(data).map(([k,v])=>`
+      <div class="chart-bar-wrap">
+        <div class="chart-bar-label"><span>${k}</span><span>${v}</span></div>
+        <div class="chart-bar-track">
+          <div class="chart-bar-fill ${colorClass}" style="width:${Math.round(v/maxVal*100)}%">${v>0?v:''}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  function barsRev(data, maxVal) {
+    return Object.entries(data).map(([k,v])=>`
+      <div class="chart-bar-wrap">
+        <div class="chart-bar-label"><span>${k}</span><span>${v.toFixed(0)}$</span></div>
+        <div class="chart-bar-track">
+          <div class="chart-bar-fill green" style="width:${Math.round(v/maxVal*100)}%">${v>0?v.toFixed(0)+'$':''}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── RENDU ──
+  document.getElementById('stats-content').innerHTML = `
+    <!-- KPI CARDS -->
+    <div class="stats-grid">
+      <div class="stat-big">
+        <div class="sb-val">${totalRDV}</div>
+        <div class="sb-lbl">RDV confirmés</div>
+        <div class="sb-sub">${getPeriodLabel()}</div>
+      </div>
+      <div class="stat-big green">
+        <div class="sb-val">${revenu.toFixed(0)}$</div>
+        <div class="sb-lbl">Revenus (avant taxes)</div>
+        <div class="sb-sub">Moy. ${revMoyen}$ / RDV</div>
+      </div>
+      <div class="stat-big blue">
+        <div class="sb-val">${allClts.length}</div>
+        <div class="sb-lbl">Clients total</div>
+        <div class="sb-sub">${reguliers} réguliers (3+ visites)</div>
+      </div>
+      <div class="stat-big red">
+        <div class="sb-val">${absences}</div>
+        <div class="sb-lbl">No-shows</div>
+        <div class="sb-sub">${totalRDV>0?Math.round(absences/totalRDV*100):0}% des RDV</div>
+      </div>
+      <div class="stat-big">
+        <div class="sb-val">${reguliers}</div>
+        <div class="sb-lbl">Clients réguliers</div>
+        <div class="sb-sub">3 visites ou plus</div>
+      </div>
+      <div class="stat-big red">
+        <div class="sb-val">${perdus}</div>
+        <div class="sb-lbl">Clients inactifs</div>
+        <div class="sb-sub">Pas de RDV depuis 60+ jours</div>
+      </div>
+    </div>
+
+    <!-- GRILLE 2 COLONNES -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+
+      <!-- RDV par barbier -->
+      <div class="stats-section">
+        <h3>✂ RDV par barbier·ère</h3>
+        ${Object.keys(parBarbier).length===0
+          ? '<p style="color:var(--dim2);font-size:0.85rem">Aucune donnée</p>'
+          : bars(parBarbier, maxBar(parBarbier))}
+      </div>
+
+      <!-- Revenus par barbier -->
+      <div class="stats-section">
+        <h3>💰 Revenus par barbier·ère</h3>
+        ${Object.keys(revParBarbier).length===0
+          ? '<p style="color:var(--dim2);font-size:0.85rem">Aucune donnée</p>'
+          : barsRev(revParBarbier, Math.max(...Object.values(revParBarbier),1))}
+      </div>
+
+      <!-- Heures populaires -->
+      <div class="stats-section">
+        <h3>🕐 Heures les plus occupées</h3>
+        ${heuresSorted.length===0
+          ? '<p style="color:var(--dim2);font-size:0.85rem">Aucune donnée</p>'
+          : heuresSorted.slice(0,8).map(([h,v])=>`
+            <div class="chart-bar-wrap">
+              <div class="chart-bar-label"><span>${h}</span><span>${v} RDV</span></div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill blue" style="width:${Math.round(v/heuresSorted[0][1]*100)}%">${v}</div>
+              </div>
+            </div>`).join('')}
+      </div>
+
+      <!-- RDV par jour de semaine -->
+      <div class="stats-section">
+        <h3>📅 RDV par jour de la semaine</h3>
+        ${jours.map((j,i)=>`
+          <div class="chart-bar-wrap">
+            <div class="chart-bar-label"><span>${j}</span><span>${parJour[i]}</span></div>
+            <div class="chart-bar-track">
+              <div class="chart-bar-fill" style="width:${Math.round(parJour[i]/Math.max(...Object.values(parJour),1)*100)}%">${parJour[i]>0?parJour[i]:''}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- SERVICES POPULAIRES -->
+    <div class="stats-section">
+      <h3>💈 Services populaires</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 2rem">
+        ${servicesSorted.slice(0,10).map(([s,v])=>`
+          <div class="chart-bar-wrap">
+            <div class="chart-bar-label"><span style="font-size:0.72rem">${s}</span><span>${v}</span></div>
+            <div class="chart-bar-track">
+              <div class="chart-bar-fill" style="width:${Math.round(v/servicesSorted[0][1]*100)}%">${v}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- RDV PAR MOIS (12 derniers) -->
+    <div class="stats-section">
+      <h3>📊 RDV & revenus par mois (12 derniers mois)</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 2rem">
+        <div>
+          <div style="font-size:0.65rem;letter-spacing:2px;color:var(--gold);margin-bottom:0.8rem;text-transform:uppercase">Nombre de RDV</div>
+          ${bars(parMois, maxBar(parMois))}
+        </div>
+        <div>
+          <div style="font-size:0.65rem;letter-spacing:2px;color:var(--green);margin-bottom:0.8rem;text-transform:uppercase">Revenus ($)</div>
+          ${barsRev(revParMois, Math.max(...Object.values(revParMois),1))}
+        </div>
+      </div>
+    </div>
+
+    <!-- FIDÉLITÉ CLIENTS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+      <div class="stats-section">
+        <h3>👥 Fidélité clients</h3>
+        <div class="client-row">
+          <span>Réguliers (3+ visites)</span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--green)">${reguliers}</span>
+        </div>
+        <div class="client-row">
+          <span>Occasionnels (2 visites)</span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold)">${occasionnels}</span>
+        </div>
+        <div class="client-row">
+          <span>Une seule visite</span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--dim2)">${uneFois}</span>
+        </div>
+        <div class="client-row">
+          <span style="color:var(--red)">Inactifs (60+ jours)</span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--red)">${perdus}</span>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h3>📈 Résumé de la période</h3>
+        <div class="client-row">
+          <span>Période analysée</span>
+          <span style="color:var(--gold)">${getPeriodLabel()}</span>
+        </div>
+        <div class="client-row">
+          <span>Total RDV</span>
+          <span style="font-weight:600">${totalRDV}</span>
+        </div>
+        <div class="client-row">
+          <span>Revenus totaux</span>
+          <span style="color:var(--green);font-weight:600">${revenu.toFixed(2)}$</span>
+        </div>
+        <div class="client-row">
+          <span>Revenu moyen / RDV</span>
+          <span>${revMoyen}$</span>
+        </div>
+        <div class="client-row">
+          <span>No-shows</span>
+          <span style="color:var(--red)">${absences} (${totalRDV>0?Math.round(absences/totalRDV*100):0}%)</span>
+        </div>
+        <div class="client-row">
+          <span>Barbier·ère le + actif·ve</span>
+          <span style="color:var(--gold)">${Object.keys(parBarbier).length>0?Object.entries(parBarbier).sort((a,b)=>b[1]-a[1])[0][0]:'—'}</span>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('nav-stats').classList.add('active');
 }
 
 // ═══════════════════════════════════════════
