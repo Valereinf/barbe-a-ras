@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
+<title>Mon compte — Barbe-À-Ras</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#C9A84C;--gold2:#E8C96B;--gold3:rgba(201,168,76,0.12);--gold4:rgba(201,168,76,0.35);
+  --black:#080808;--charcoal:#131313;--white:#F5F0E8;--dim:rgba(245,240,232,0.65);
+  --dim2:rgba(245,240,232,0.35);--red:#e74c3c;--green:#27ae60;
+}
+body{font-family:'Barlow',sans-serif;background:var(--black);color:var(--white);
+  min-height:100vh;display:flex;flex-direction:column}
+nav{height:64px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 2rem;background:rgba(8,8,8,0.97);border-bottom:1px solid var(--gold4)}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px;
+  color:var(--gold);text-decoration:none}
+.nav-tel{font-family:'Bebas Neue',sans-serif;font-size:0.95rem;letter-spacing:2px;
+  color:var(--gold);text-decoration:none}
+.page{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem}
+.card{background:var(--charcoal);border:1px solid var(--gold4);max-width:420px;
+  width:100%;padding:2.5rem}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:4px;
+  color:var(--gold);text-align:center;margin-bottom:0.2rem}
+.logo-sub{font-size:0.62rem;letter-spacing:3px;color:var(--dim2);text-align:center;margin-bottom:1.5rem}
+.gold-bar{width:40px;height:2px;background:var(--gold);margin:0 auto 2rem}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--gold4);margin-bottom:1.8rem}
+.tab-btn{flex:1;padding:0.7rem;background:none;border:none;color:var(--dim2);
+  font-family:'Barlow',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;border-bottom:2px solid transparent}
+.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* Form */
+.field-group{margin-bottom:1.2rem}
+label{display:block;font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;
+  color:var(--dim2);margin-bottom:0.4rem}
+input{width:100%;background:rgba(245,240,232,0.04);border:1px solid var(--gold4);
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:0.9rem;
+  padding:0.75rem 1rem;outline:none;transition:border-color 0.2s}
+input:focus{border-color:var(--gold)}
+input::placeholder{color:var(--dim2)}
+.btn-gold{width:100%;background:var(--gold);color:var(--black);border:none;
+  padding:0.9rem;font-family:'Barlow',sans-serif;font-size:0.85rem;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;margin-top:0.5rem}
+.btn-gold:hover{background:var(--gold2)}
+.btn-gold:disabled{opacity:0.5;cursor:not-allowed}
+.error-msg{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);
+  color:var(--red);padding:0.7rem 1rem;font-size:0.82rem;margin-bottom:1rem;display:none}
+.success-msg{background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);
+  color:var(--green);padding:0.7rem 1rem;font-size:0.82rem;margin-bottom:1rem;display:none}
+.divider{display:flex;align-items:center;gap:0.8rem;margin:1.2rem 0;
+  color:var(--dim2);font-size:0.75rem}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--gold4)}
+.link-btn{background:none;border:none;color:var(--gold);font-size:0.82rem;
+  cursor:pointer;text-decoration:underline;width:100%;text-align:center;
+  margin-top:0.8rem;padding:0.3rem}
+.spinner{width:18px;height:18px;border:2px solid rgba(0,0,0,0.2);
+  border-top-color:var(--black);border-radius:50%;animation:spin 0.7s linear infinite;
+  display:inline-block;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.field-hint{font-size:0.72rem;color:var(--dim2);margin-top:0.3rem}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html" class="nav-logo">✂ BARBE-À-RAS</a>
+  <a href="tel:4186122007" class="nav-tel">418-612-2007</a>
+</nav>
+<div class="page">
+  <div class="card">
+    <div class="logo">MON COMPTE</div>
+    <div class="logo-sub">Barbe-À-Ras · Chicoutimi</div>
+    <div class="gold-bar"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-login-btn" onclick="switchTab('login')">Connexion</button>
+      <button class="tab-btn" id="tab-signup-btn" onclick="switchTab('signup')">Créer un compte</button>
+    </div>
+
+    <!-- Messages -->
+    <div class="error-msg" id="error-msg"></div>
+    <div class="success-msg" id="success-msg"></div>
+
+    <!-- CONNEXION -->
+    <div id="tab-login">
+      <div class="field-group">
+        <label>Adresse courriel</label>
+        <input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label>Mot de passe</label>
+        <input type="password" id="login-pwd" placeholder="••••••••" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn-gold" id="btn-login" onclick="doLogin()">Se connecter</button>
+      <button class="link-btn" onclick="doReset()">Mot de passe oublié ?</button>
+    </div>
+
+    <!-- INSCRIPTION -->
+    <div id="tab-signup" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+        <div class="field-group">
+          <label>Prénom *</label>
+          <input type="text" id="signup-prenom" placeholder="Jean" autocomplete="given-name">
+        </div>
+        <div class="field-group">
+          <label>Nom *</label>
+          <input type="text" id="signup-nom" placeholder="Tremblay" autocomplete="family-name">
+        </div>
+      </div>
+      <div class="field-group">
+        <label>Téléphone *</label>
+        <input type="tel" id="signup-tel" placeholder="514-555-1234" autocomplete="tel">
+      </div>
+      <div class="field-group">
+        <label>Adresse courriel *</label>
+        <input type="email" id="signup-email" placeholder="votre@email.com" autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label>Mot de passe *</label>
+        <input type="password" id="signup-pwd" placeholder="Minimum 6 caractères" autocomplete="new-password">
+        <div class="field-hint">Minimum 6 caractères</div>
+      </div>
+      <button class="btn-gold" id="btn-signup" onclick="doSignup()">Créer mon compte</button>
+      <p style="font-size:0.72rem;color:var(--dim2);text-align:center;margin-top:1rem;line-height:1.5">
+        En créant un compte, vous acceptez notre politique de confidentialité.<br>
+        Vos données ne sont jamais partagées.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Rediriger si déjà connecté
+sb.auth.getSession().then(({data:{session}}) => {
+  if(session) window.location.href = '/mon-compte.html';
+});
+
+function switchTab(tab) {
+  document.getElementById('tab-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('tab-signup').style.display = tab==='signup'?'block':'none';
+  document.getElementById('tab-login-btn').classList.toggle('active', tab==='login');
+  document.getElementById('tab-signup-btn').classList.toggle('active', tab==='signup');
+  hideMessages();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('success-msg').style.display = 'none';
+}
+function showSuccess(msg) {
+  const el = document.getElementById('success-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('error-msg').style.display = 'none';
+}
+function hideMessages() {
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('success-msg').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pwd   = document.getElementById('login-pwd').value;
+  if(!email||!pwd) { showError('Veuillez remplir tous les champs.'); return; }
+
+  const btn = document.getElementById('btn-login');
+  btn.innerHTML = '<span class="spinner"></span>Connexion...';
+  btn.disabled = true;
+
+  const {data, error} = await sb.auth.signInWithPassword({email, password:pwd});
+  if(error) {
+    showError(error.message.includes('Invalid') ? 'Courriel ou mot de passe incorrect.' : error.message);
+    btn.innerHTML = 'Se connecter'; btn.disabled = false;
+    return;
+  }
+  window.location.href = '/mon-compte.html';
+}
+
+async function doSignup() {
+  const prenom = document.getElementById('signup-prenom').value.trim();
+  const nom    = document.getElementById('signup-nom').value.trim();
+  const tel    = document.getElementById('signup-tel').value.trim();
+  const email  = document.getElementById('signup-email').value.trim();
+  const pwd    = document.getElementById('signup-pwd').value;
+
+  if(!prenom||!nom||!tel||!email||!pwd) { showError('Veuillez remplir tous les champs.'); return; }
+  if(pwd.length < 6) { showError('Le mot de passe doit contenir au moins 6 caractères.'); return; }
+
+  const btn = document.getElementById('btn-signup');
+  btn.innerHTML = '<span class="spinner"></span>Création...';
+  btn.disabled = true;
+
+  // Créer le compte Auth
+  const {data:authData, error:authError} = await sb.auth.signUp({
+    email, password: pwd,
+    options: { data: { prenom, nom, tel } }
+  });
+
+  if(authError) {
+    const msg = authError.message.includes('already') ? 'Un compte existe déjà avec cet email.' : authError.message;
+    showError(msg); btn.innerHTML = 'Créer mon compte'; btn.disabled = false;
+    return;
+  }
+
+  // Vérifier si le client existe déjà (même téléphone ou email)
+  const telClean = tel.replace(/\D/g,'');
+  const {data:existing} = await sb.from('clients')
+    .select('id')
+    .or(`telephone.eq.${telClean},email.eq.${email}`)
+    .single();
+
+  if(existing) {
+    // Lier le compte auth au client existant
+    await sb.from('clients').update({
+      auth_user_id: authData.user.id,
+      email: email
+    }).eq('id', existing.id);
+  } else {
+    // Créer un nouveau client
+    await sb.from('clients').insert({
+      prenom, nom,
+      telephone: telClean,
+      email,
+      auth_user_id: authData.user.id,
+      points_fidelite: 0
+    });
+  }
+
+  showSuccess('Compte créé ! Vérifiez votre courriel pour confirmer votre adresse.');
+  btn.innerHTML = 'Créer mon compte'; btn.disabled = false;
+}
+
+async function doReset() {
+  const email = document.getElementById('login-email').value.trim();
+  if(!email) { showError('Entrez votre adresse courriel pour réinitialiser le mot de passe.'); return; }
+  const {error} = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://barbe-a-ras.ca/compte.html'
+  });
+  if(error) showError(error.message);
+  else showSuccess('Lien de réinitialisation envoyé à ' + email);
+}
+</script>
+</body>
+</html>
