@@ -15,3 +15,8 @@
 # Cron: reminder runs daily at 10:00 UTC
 [functions."reminder-24h"]
   schedule = "0 10 * * *"
+
+# Cron: send review SMS every 30 minutes
+[functions."send-review-sms"]
+  schedule = "*/30 * * * *"
+
