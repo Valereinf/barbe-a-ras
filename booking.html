@@ -170,7 +170,24 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
   <h1 class="page-title">Prendre <span class="g">rendez-vous</span></h1>
   <p class="page-sub">749 Rue d'Alma, Local 101 · Chicoutimi (Saguenay), QC</p>
   <div class="gold-bar"></div>
-  <div class="steps" id="steps">
+  <!-- Mini avis au-dessus du booking -->
+<div id="mini-avis" style="background:#0d0d0d;border-bottom:1px solid rgba(201,168,76,0.15);
+  padding:1rem 0;display:none">
+  <div style="max-width:900px;margin:0 auto;padding:0 1.5rem">
+    <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:0.6rem;flex-shrink:0">
+        <span id="mini-note" style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--gold)">—</span>
+        <div>
+          <div id="mini-stars" style="font-size:0.9rem;letter-spacing:1px">⭐⭐⭐⭐⭐</div>
+          <div id="mini-nb" style="font-size:0.65rem;letter-spacing:1px;color:rgba(245,240,232,0.3)">— AVIS</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.8rem;overflow:hidden;flex:1" id="mini-comments"></div>
+    </div>
+  </div>
+</div>
+
+<div class="steps" id="steps">
     <div class="step active" id="si1"><span class="n">01</span><span>Barbier</span></div>
     <div class="step" id="si2"><span class="n">02</span><span>Services</span></div>
     <div class="step" id="si3"><span class="n">03</span><span>Date</span></div>
@@ -1059,8 +1076,7 @@ async function submitBooking(){
     allPriceStr = allPrice.toFixed(2)+'$';
     const {data:resa,error:re}=await sb.from('reservations').insert({
       client_id:clientId,barbier:finalBarber,service:allSvcNames,prix:allPriceStr,
-      date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note,
-      avec_preference: S.barber!=='Sans préférence'
+      date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note
     }).select('id').single();
     if(re){hideOverlay();showToast('Erreur lors de la réservation. Réessayez.','error');return;}
     resaId = resa.id;
@@ -1335,6 +1351,34 @@ function addAnotherService(){
 
 // Charger les collaborateurs au démarrage
 loadBookingCollabs();
+
+// Charger les mini avis
+(async function() {
+  const {data:avis} = await sb.from('avis')
+    .select('note,commentaire,barbier')
+    .eq('afficher', true)
+    .gte('note', 4)
+    .order('note', {ascending:false})
+    .limit(50);
+  if(!avis || avis.length===0) return;
+
+  const moy = (avis.reduce((s,a)=>s+a.note,0)/avis.length).toFixed(1);
+  document.getElementById('mini-note').textContent = moy;
+  document.getElementById('mini-stars').textContent = '⭐'.repeat(Math.round(parseFloat(moy)));
+  document.getElementById('mini-nb').textContent = avis.length + ' AVIS VÉRIFIÉS';
+
+  // Afficher 3 commentaires aléatoires
+  const avecComm = avis.filter(a=>a.commentaire);
+  const choisis = avecComm.sort(()=>Math.random()-0.5).slice(0,3);
+  document.getElementById('mini-comments').innerHTML = choisis.map(a=>`
+    <div style="background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.15);
+      padding:0.6rem 0.8rem;font-size:0.75rem;color:rgba(245,240,232,0.6);
+      flex:1;min-width:150px;max-width:220px;line-height:1.5">
+      "${ a.commentaire.length>60 ? a.commentaire.substring(0,60)+'…' : a.commentaire }"
+    </div>`).join('');
+
+  document.getElementById('mini-avis').style.display = 'block';
+})();
 
 // ═══════════════════════════════════════════
 // REALTIME — synchronisation en temps réel
