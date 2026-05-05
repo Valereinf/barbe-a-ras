@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
+<title>Votre avis — Barbe-À-Ras</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#C9A84C;--gold2:#E8C96B;--gold3:rgba(201,168,76,0.12);--gold4:rgba(201,168,76,0.35);
+  --black:#080808;--charcoal:#131313;--white:#F5F0E8;--dim:rgba(245,240,232,0.65);
+  --dim2:rgba(245,240,232,0.35);--red:#e74c3c;--green:#27ae60;
+}
+body{font-family:'Barlow',sans-serif;background:var(--black);color:var(--white);
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:2rem}
+.card{background:var(--charcoal);border:1px solid var(--gold4);max-width:480px;
+  width:100%;padding:2.5rem}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:4px;
+  color:var(--gold);text-align:center;margin-bottom:0.2rem}
+.logo-sub{font-size:0.65rem;letter-spacing:3px;text-transform:uppercase;
+  color:var(--dim2);text-align:center;margin-bottom:1.5rem}
+.gold-bar{width:40px;height:2px;background:var(--gold);margin:0 auto 2rem}
+
+/* Barbier info */
+.barbier-card{display:flex;align-items:center;gap:1rem;background:var(--gold3);
+  border:1px solid var(--gold4);padding:1rem;margin-bottom:1.8rem}
+.barbier-avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;
+  border:2px solid var(--gold4)}
+.barbier-avatar-placeholder{width:48px;height:48px;border-radius:50%;
+  background:var(--gold3);border:2px solid var(--gold4);display:flex;
+  align-items:center;justify-content:center;font-size:1.3rem}
+.barbier-name{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;
+  letter-spacing:2px;color:var(--white)}
+.barbier-service{font-size:0.75rem;color:var(--dim2);margin-top:2px}
+
+/* Étoiles */
+.stars-label{font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;
+  color:var(--dim2);margin-bottom:0.8rem;text-align:center}
+.stars{display:flex;justify-content:center;gap:0.5rem;margin-bottom:0.6rem}
+.star{font-size:2.8rem;cursor:pointer;transition:transform 0.15s;
+  filter:grayscale(1);opacity:0.3;user-select:none;line-height:1}
+.star:hover,.star.active{filter:none;opacity:1;transform:scale(1.1)}
+.stars-desc{text-align:center;font-size:0.8rem;color:var(--gold);
+  height:1.2rem;margin-bottom:1.5rem;letter-spacing:1px}
+
+/* Commentaire */
+.comment-label{font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;
+  color:var(--dim2);margin-bottom:0.5rem;display:block}
+textarea{width:100%;background:rgba(245,240,232,0.04);border:1px solid var(--gold4);
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:0.87rem;
+  padding:0.9rem;resize:none;height:100px;margin-bottom:1.5rem;outline:none;
+  transition:border-color 0.2s}
+textarea:focus{border-color:var(--gold)}
+textarea::placeholder{color:var(--dim2)}
+
+/* Bouton */
+.btn-submit{width:100%;background:var(--gold);color:var(--black);border:none;
+  padding:1rem;font-family:'Barlow',sans-serif;font-size:0.85rem;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+.btn-submit:hover{background:var(--gold2)}
+.btn-submit:disabled{opacity:0.4;cursor:not-allowed}
+.btn-skip{display:block;text-align:center;color:var(--dim2);font-size:0.78rem;
+  margin-top:0.8rem;cursor:pointer;letter-spacing:1px;background:none;border:none;
+  width:100%;padding:0.3rem}
+.btn-skip:hover{color:var(--white)}
+
+/* États */
+.msg{text-align:center;padding:1rem 0}
+.msg-icon{font-size:3.5rem;margin-bottom:1rem}
+.msg h2{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;margin-bottom:0.8rem}
+.msg p{font-size:0.87rem;color:var(--dim);line-height:1.7}
+.spinner{width:32px;height:32px;border:2px solid var(--gold4);
+  border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;
+  margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{text-align:center;padding:2rem;color:var(--dim2);font-size:0.85rem}
+
+/* Politique */
+.policy-note{font-size:0.72rem;color:var(--dim2);text-align:center;
+  margin-top:1rem;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="logo">✂ BARBE-À-RAS</div>
+  <div class="logo-sub">Barbershop · Chicoutimi</div>
+  <div class="gold-bar"></div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    Chargement...
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const params = new URLSearchParams(window.location.search);
+const token  = params.get('token');
+const resaId = params.get('id');
+
+const STAR_LABELS = ['','Mauvais 😞','Passable 😐','Bien 🙂','Très bien 😊','Excellent ! 🤩'];
+
+let selectedNote = 0;
+let resa = null;
+
+async function init() {
+  if(!token || !resaId) { showError('Lien invalide.'); return; }
+
+  const {data, error} = await sb.from('reservations')
+    .select('*, clients(prenom,nom), collaborateurs:barbier(nom,photo_url)')
+    .eq('id', resaId)
+    .eq('avis_token', token)
+    .single();
+
+  if(error || !data) { showError('Ce lien est invalide ou a déjà été utilisé.'); return; }
+
+  // Vérifier si avis déjà donné
+  const {data:existingAvis} = await sb.from('avis')
+    .select('id').eq('reservation_id', resaId).single();
+  if(existingAvis) { showAlready(); return; }
+
+  resa = data;
+  renderForm();
+}
+
+function renderForm() {
+  const photo = resa.collaborateurs?.photo_url || null;
+  const avatarHtml = photo
+    ? `<img src="${photo}" class="barbier-avatar" alt="${resa.barbier}">`
+    : `<div class="barbier-avatar-placeholder">✂</div>`;
+
+  document.getElementById('card').innerHTML = `
+    <div class="logo">✂ BARBE-À-RAS</div>
+    <div class="logo-sub">Barbershop · Chicoutimi</div>
+    <div class="gold-bar"></div>
+
+    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;
+      color:var(--gold);margin-bottom:1rem;text-align:center">
+      Comment s'est passé votre visite ?
+    </h3>
+
+    <div class="barbier-card">
+      ${avatarHtml}
+      <div>
+        <div class="barbier-name">${resa.barbier}</div>
+        <div class="barbier-service">${resa.service}</div>
+      </div>
+    </div>
+
+    <div class="stars-label">Votre note</div>
+    <div class="stars" id="stars">
+      ${[1,2,3,4,5].map(n=>`<span class="star" data-n="${n}" onclick="setNote(${n})">⭐</span>`).join('')}
+    </div>
+    <div class="stars-desc" id="stars-desc">Touchez une étoile</div>
+
+    <label class="comment-label">Commentaire <span style="color:var(--dim2)">(optionnel)</span></label>
+    <textarea id="commentaire" placeholder="Dites-nous ce que vous avez aimé..."></textarea>
+
+    <button class="btn-submit" id="btn-submit" disabled onclick="soumettre()">
+      ★ Envoyer mon avis
+    </button>
+    <button class="btn-skip" onclick="passer()">Non merci, passer</button>
+    <p class="policy-note">Votre avis peut être affiché publiquement sur notre site web.</p>`;
+}
+
+function setNote(n) {
+  selectedNote = n;
+  document.querySelectorAll('.star').forEach((s,i) => {
+    s.classList.toggle('active', i < n);
+  });
+  document.getElementById('stars-desc').textContent = STAR_LABELS[n];
+  document.getElementById('btn-submit').disabled = false;
+}
+
+async function soumettre() {
+  if(!selectedNote) return;
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('btn-submit').textContent = 'Envoi en cours...';
+
+  const commentaire = document.getElementById('commentaire').value.trim() || null;
+
+  const {error} = await sb.from('avis').insert({
+    reservation_id: resaId,
+    client_id: resa.client_id,
+    barbier: resa.barbier,
+    note: selectedNote,
+    commentaire,
+    afficher: true
+  });
+
+  if(error) { showError('Erreur lors de l\'envoi. Réessayez.'); return; }
+
+  // Marquer avis_token comme utilisé
+  await sb.from('reservations').update({ avis_token: null }).eq('id', resaId);
+
+  showSuccess(selectedNote);
+}
+
+function passer() {
+  // Invalider le token pour qu'on ne puisse pas y revenir
+  sb.from('reservations').update({ avis_token: null }).eq('id', resaId);
+  showPassed();
+}
+
+function showSuccess(note) {
+  const msgs = {
+    5: 'Merci infiniment pour votre avis 5 étoiles ! 🌟 Votre confiance nous touche.',
+    4: 'Merci pour votre retour positif ! C\'est toujours un plaisir de vous accueillir.',
+    3: 'Merci pour votre avis. Nous prenons note de vos commentaires pour nous améliorer.',
+    2: 'Merci pour votre retour. Nous allons travailler pour faire mieux.',
+    1: 'Merci pour votre honnêteté. Nous ferons tout pour améliorer votre prochaine expérience.'
+  };
+  document.getElementById('card').innerHTML = `
+    <div class="logo">✂ BARBE-À-RAS</div>
+    <div class="logo-sub">Barbershop · Chicoutimi</div>
+    <div class="gold-bar"></div>
+    <div class="msg">
+      <div class="msg-icon">${note >= 4 ? '🌟' : '🙏'}</div>
+      <h2 style="color:var(--gold)">Merci !</h2>
+      <p>${msgs[note]}</p>
+      <a href="/" style="display:inline-block;margin-top:1.5rem;background:var(--gold);
+        color:var(--black);padding:0.8rem 2rem;font-weight:700;letter-spacing:2px;
+        text-decoration:none;font-size:0.82rem;text-transform:uppercase">
+        Retour au site
+      </a>
+    </div>`;
+}
+
+function showPassed() {
+  document.getElementById('card').innerHTML = `
+    <div class="logo">✂ BARBE-À-RAS</div>
+    <div class="logo-sub">Barbershop · Chicoutimi</div>
+    <div class="gold-bar"></div>
+    <div class="msg">
+      <div class="msg-icon">👋</div>
+      <h2>À bientôt !</h2>
+      <p>Merci de votre visite chez Barbe-À-Ras.</p>
+      <a href="/" style="display:inline-block;margin-top:1.5rem;background:var(--gold);
+        color:var(--black);padding:0.8rem 2rem;font-weight:700;letter-spacing:2px;
+        text-decoration:none;font-size:0.82rem;text-transform:uppercase">
+        Retour au site
+      </a>
+    </div>`;
+}
+
+function showAlready() {
+  document.getElementById('card').innerHTML = `
+    <div class="logo">✂ BARBE-À-RAS</div>
+    <div class="logo-sub">Barbershop · Chicoutimi</div>
+    <div class="gold-bar"></div>
+    <div class="msg">
+      <div class="msg-icon">✅</div>
+      <h2>Avis déjà soumis</h2>
+      <p>Vous avez déjà donné votre avis pour ce rendez-vous. Merci !</p>
+      <a href="/" style="display:inline-block;margin-top:1.5rem;background:var(--gold);
+        color:var(--black);padding:0.8rem 2rem;font-weight:700;letter-spacing:2px;
+        text-decoration:none;font-size:0.82rem;text-transform:uppercase">
+        Retour au site
+      </a>
+    </div>`;
+}
+
+function showError(msg) {
+  document.getElementById('card').innerHTML = `
+    <div class="logo">✂ BARBE-À-RAS</div>
+    <div class="logo-sub">Barbershop · Chicoutimi</div>
+    <div class="gold-bar"></div>
+    <div class="msg">
+      <div class="msg-icon">❌</div>
+      <h2 style="color:var(--red)">Erreur</h2>
+      <p>${msg}</p>
+      <a href="/" style="color:var(--gold);font-size:0.82rem;margin-top:1rem;display:inline-block">← Retour</a>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
