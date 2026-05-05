@@ -276,6 +276,11 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
   </ul>
   <div class="nav-right">
     <a class="nav-tel" href="tel:4186122007">418-612-2007</a>
+    <a href="compte.html" style="color:var(--dim2);font-size:0.72rem;letter-spacing:2px;
+      text-decoration:none;text-transform:uppercase;transition:color 0.2s"
+      onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--dim2)'">
+      👤 Mon compte
+    </a>
     <a class="nav-btn" href="booking.html">Réserver ›</a>
   </div>
 </nav>
@@ -719,7 +724,7 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
       <div class="barbier-tag">✂ ${a.barbier}</div>
       <div class="date-tag">${date}</div>`;
     track.appendChild(card);
-  }); 
+  });
 
   // Dots
   const pages = Math.ceil(avis.length / perPage);
