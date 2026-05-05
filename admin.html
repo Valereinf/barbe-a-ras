@@ -219,6 +219,10 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .cal-slot .slot-badge{font-size:0.6rem;letter-spacing:1px;padding:0.1rem 0.4rem;border-radius:2px}
 .cal-slot.free .slot-badge{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
 .cal-slot.booked .slot-badge{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
+.cal-slot.pause{background:rgba(201,168,76,0.06);border-left:3px solid rgba(201,168,76,0.4);cursor:pointer;transition:all 0.2s}
+.cal-slot.pause:hover{background:rgba(201,168,76,0.15);border-left-color:var(--gold)}
+.cal-slot.pause .slot-time{color:rgba(201,168,76,0.6)}
+.cal-slot.pause .slot-badge{background:rgba(201,168,76,0.1);color:rgba(201,168,76,0.7);border:1px solid rgba(201,168,76,0.3);font-size:0.6rem}
 
 /* TOAST */
 .toast{position:fixed;bottom:2rem;right:2rem;background:var(--charcoal);
@@ -1095,9 +1099,8 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 // CONFIG & STATE
 // ═══════════════════════════════════════════
 const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
-
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
-const ADMIN_PWD = '040902Bs';
+const ADMIN_PWD = 'Always6Win3';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allResa = [], allClients = [], allWaitlist = [];
@@ -1285,7 +1288,6 @@ function renderResa(data) {
           ${r.barbier && r.barbier!=='Sans préférence'
             ? '<span title="A choisi son barbier" style="margin-left:4px;font-size:0.85rem">❤️</span>'
             : ''}
-          ${r.note_client ? '<span title="Note client" style="margin-left:3px">💬</span>' : ''}
         </div>
         <div style="font-size:0.75rem;color:var(--dim2)">${r.clients?.telephone||''}</div>
       </td>
@@ -2306,15 +2308,33 @@ async function loadCalendrier(dateStr) {
   // Colonne par collaborateur
   calGrid.style.gridTemplateColumns = collabs.map(()=>'1fr').join(' ');
 
-  // Charger les réservations et indisponibilités pour tous les collaborateurs
-  const [indiResp, ...resaResps] = await Promise.all([
+  // Charger les réservations, indisponibilités et horaires collaborateurs
+  const [indiResp, horairesResp, exceptionsResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
-    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,note_client,avec_preference,no_show,groupe_id,clients(prenom,nom)')
+    sb.from('horaires_collaborateurs').select('*').in('barbier', collabs.map(c=>c.nom)),
+    sb.from('horaires_exceptions').select('*').eq('actif',true)
+      .lte('date_debut',dateStr).gte('date_fin',dateStr),
+    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
       .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
   ]);
   const indis = indiResp.data||[];
+  const horairesData = horairesResp.data||[];
+  const exceptionsData = exceptionsResp.data||[];
 
-  // Générer les slots pour ce jour (ex: 30min steps)
+  // Fonction pour obtenir horaires + pauses d'un collaborateur ce jour
+  function getCollabHoraires(nomCollab) {
+    // Vérifier exception de période en premier
+    const exc = exceptionsData.find(e=>e.barbier===nomCollab);
+    if(exc) return {debut:exc.debut, fin:exc.fin, pauses: typeof exc.pauses==='string'?JSON.parse(exc.pauses):(exc.pauses||[])};
+    // Horaire standard du jour
+    const h = horairesData.find(r=>r.barbier===nomCollab && parseInt(r.dow)===dow);
+    if(h && h.actif) return {debut:h.debut, fin:h.fin, pauses: typeof h.pauses==='string'?JSON.parse(h.pauses):(h.pauses||[])};
+    return null;
+  }
+
+  function toM(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
+
+  // Générer les slots pour ce jour selon les horaires réels du collaborateur
   const slotStep = 30;
   const startH = isSat?8:9, endH = isSat?12:(dow>=4?20:17);
   const allSlots=[];
@@ -2326,30 +2346,47 @@ async function loadCalendrier(dateStr) {
     const isBlocked = indis.some(i=>i.barbier===c.nom||i.barbier==='Tous');
     const count = isBlocked ? '🔴 Indisponible' : `${Object.keys(booked).length} RDV · ${allSlots.filter(t=>!booked[t]).length} libres`;
 
+    // Obtenir les pauses du collaborateur ce jour
+    const collabH = getCollabHoraires(c.nom);
+    const pauses = collabH?.pauses || [];
+
+    // Générer les slots selon les horaires réels du collab
+    const collabSlots = collabH
+      ? (()=>{
+          const slots=[];
+          for(let m=toM(collabH.debut);m<toM(collabH.fin);m+=slotStep)
+            slots.push((Math.floor(m/60)+'').padStart(2,'0')+':'+(m%60+'').padStart(2,'0'));
+          return slots;
+        })()
+      : allSlots;
+
     const slotsHtml = isBlocked
       ? `<div style="padding:2rem;text-align:center;color:var(--red)">🔴 <strong>Indisponible</strong><br>
           <span style="font-size:0.78rem;color:var(--dim2)">${indis.find(i=>i.barbier===c.nom||i.barbier==='Tous')?.raison||'Congé'}</span></div>`
-      : allSlots.map(t => {
+      : collabSlots.map(t => {
           const r = booked[t];
+          const tM = toM(t);
+
+          // Vérifier si ce slot est dans une pause
+          const inPause = pauses.find(p => tM >= toM(p.debut) && tM < toM(p.fin));
+
           if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
             const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
-            const hasPref = r.avec_preference === true;
-            const hasNote = !!r.note_client;
-            const isNoShow = r.no_show === true;
-            const isPeriodic = !!r.groupe_id;
-            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')" style="${isNoShow?'opacity:0.55;border-left:3px solid var(--red)':''}">
+            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')">
+              <span class="slot-time">${t}</span>
+              <div class="slot-info"><div class="slot-name">${nom}</div><div class="slot-svc">${svc}</div></div>
+              <span class="slot-badge">RDV</span></div>`;
+          } else if(inPause) {
+            // Slot en pause — cliquable pour RDV urgent
+            return `<div class="cal-slot pause" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')"
+              title="Pause ${inPause.debut}–${inPause.fin} · Cliquer pour RDV urgent">
               <span class="slot-time">${t}</span>
               <div class="slot-info">
-                <div class="slot-name">
-                  ${hasPref ? '<span title="Préférence barbier">❤️</span> ' : ''}${nom}
-                  ${isPeriodic ? '<span title="Périodique" style="font-size:0.7rem;margin-left:2px">🔁</span>' : ''}
-                  ${isNoShow ? '<span title="Absent" style="font-size:0.7rem;margin-left:2px">🚫</span>' : ''}
-                  ${hasNote ? '💬' : ''}
-                </div>
-                <div class="slot-svc">${svc}</div>
+                <div style="font-size:0.75rem;color:rgba(201,168,76,0.6)">☕ Pause ${inPause.debut}–${inPause.fin}</div>
+                <div style="font-size:0.68rem;color:var(--dim2)">Cliquer pour RDV urgent</div>
               </div>
-              <span class="slot-badge">RDV</span></div>`;
+              <span class="slot-badge">☕ RDV?</span></div>`;
           } else {
             return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')">
               <span class="slot-time">${t}</span>
