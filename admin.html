@@ -1095,6 +1095,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 // CONFIG & STATE
 // ═══════════════════════════════════════════
 const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
 const ADMIN_PWD = 'Always6Win3';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1198,7 +1199,7 @@ async function loadAll() {
 // ═══════════════════════════════════════════
 async function loadReservations() {
   const {data} = await sb.from('reservations')
-    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, no_show, avec_preference, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences,derniere_absence)')
+    .select('id, client_id, barbier, service, prix, date_rdv, heure_rdv, statut, no_show, note_client, note_staff, rappel_envoye, groupe_id, clients(id,prenom,nom,email,telephone,est_bloque,nb_absences,derniere_absence)')
     .order('date_rdv',{ascending:false})
     .order('heure_rdv',{ascending:true});
   allResa = data||[];
@@ -1281,9 +1282,10 @@ function renderResa(data) {
       <td>
         <div>
           ${r.clients?.prenom||''} ${r.clients?.nom||''}
-          ${r.avec_preference===true
+          ${r.barbier && r.barbier!=='Sans préférence'
             ? '<span title="A choisi son barbier" style="margin-left:4px;font-size:0.85rem">❤️</span>'
             : ''}
+          ${r.note_client ? '<span title="Note client" style="margin-left:3px">💬</span>' : ''}
         </div>
         <div style="font-size:0.75rem;color:var(--dim2)">${r.clients?.telephone||''}</div>
       </td>
@@ -2307,7 +2309,7 @@ async function loadCalendrier(dateStr) {
   // Charger les réservations et indisponibilités pour tous les collaborateurs
   const [indiResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
-    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,no_show,groupe_id,avec_preference,clients(prenom,nom)')
+    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,note_client,avec_preference,no_show,groupe_id,clients(prenom,nom)')
       .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
   ]);
   const indis = indiResp.data||[];
@@ -2332,19 +2334,18 @@ async function loadCalendrier(dateStr) {
           if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
             const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
-            // ❤️ = client avait une préférence (on le sait si c'est pas "Sans préférence" dans allResa)
-            // avec_preference = true si le client a explicitement choisi ce barbier
             const hasPref = r.avec_preference === true;
+            const hasNote = !!r.note_client;
             const isNoShow = r.no_show === true;
             const isPeriodic = !!r.groupe_id;
-            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')" style="${isNoShow?'opacity:0.5;border-left:3px solid var(--red)':''}">
+            return `<div class="cal-slot booked" onclick="openResaById('${r.id}')" style="${isNoShow?'opacity:0.55;border-left:3px solid var(--red)':''}">
               <span class="slot-time">${t}</span>
               <div class="slot-info">
                 <div class="slot-name">
-                  ${hasPref?'<span title="Préférence barbier" style="margin-right:3px">❤️</span>':''}
-                  ${nom}
-                  ${isPeriodic?'<span title="RDV périodique" style="margin-left:3px;font-size:0.7rem">🔁</span>':''}
-                  ${isNoShow?'<span title="Absent" style="margin-left:3px;font-size:0.7rem">🚫</span>':''}
+                  ${hasPref ? '<span title="Préférence barbier">❤️</span> ' : ''}${nom}
+                  ${isPeriodic ? '<span title="Périodique" style="font-size:0.7rem;margin-left:2px">🔁</span>' : ''}
+                  ${isNoShow ? '<span title="Absent" style="font-size:0.7rem;margin-left:2px">🚫</span>' : ''}
+                  ${hasNote ? '💬' : ''}
                 </div>
                 <div class="slot-svc">${svc}</div>
               </div>
