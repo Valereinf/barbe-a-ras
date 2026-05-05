@@ -229,6 +229,38 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
   .gal-grid{grid-template-columns:1fr;grid-template-rows:auto}
   .footer-bottom{flex-direction:column;text-align:center}
 }
+
+/* ── AVIS CLIENTS ── */
+.avis-section{padding:5rem 0;background:#0d0d0d;overflow:hidden}
+.avis-section .section-title{text-align:center;margin-bottom:0.5rem}
+.avis-section .section-sub{text-align:center;color:rgba(245,240,232,0.4);
+  font-size:0.82rem;letter-spacing:2px;margin-bottom:0.8rem}
+.avis-moyenne{text-align:center;margin-bottom:3rem}
+.avis-moyenne .note{font-family:'Bebas Neue',sans-serif;font-size:3.5rem;
+  color:var(--gold);line-height:1}
+.avis-moyenne .etoiles{font-size:1.4rem;letter-spacing:3px;margin:0.2rem 0}
+.avis-moyenne .nb{font-size:0.75rem;letter-spacing:2px;color:rgba(245,240,232,0.4)}
+.carousel-wrap{position:relative;overflow:hidden}
+.carousel-track{display:flex;gap:1.5rem;transition:transform 0.5s ease;will-change:transform}
+.avis-card{background:#131313;border:1px solid rgba(201,168,76,0.2);
+  padding:1.8rem;min-width:320px;max-width:320px;flex-shrink:0;position:relative}
+.avis-card::before{content:'';position:absolute;top:0;left:0;right:0;
+  height:2px;background:var(--gold);opacity:0.6}
+.avis-card .stars{font-size:1.1rem;letter-spacing:2px;margin-bottom:0.8rem}
+.avis-card .comment{font-size:0.87rem;color:rgba(245,240,232,0.7);line-height:1.7;
+  margin-bottom:1rem;font-style:italic}
+.avis-card .barbier-tag{font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;
+  color:var(--gold);opacity:0.7}
+.avis-card .date-tag{font-size:0.68rem;color:rgba(245,240,232,0.25);margin-top:4px}
+.carousel-nav{display:flex;justify-content:center;gap:0.8rem;margin-top:2rem}
+.carousel-dot{width:8px;height:8px;border-radius:50%;background:rgba(201,168,76,0.2);
+  cursor:pointer;transition:all 0.2s;border:none}
+.carousel-dot.active{background:var(--gold);transform:scale(1.2)}
+.carousel-arrows{display:flex;justify-content:center;gap:1rem;margin-top:1.2rem}
+.carousel-arrow{background:none;border:1px solid rgba(201,168,76,0.3);color:var(--gold);
+  width:40px;height:40px;cursor:pointer;font-size:1.1rem;transition:all 0.2s}
+.carousel-arrow:hover{background:rgba(201,168,76,0.1);border-color:var(--gold)}
+.avis-empty{text-align:center;color:rgba(245,240,232,0.3);font-size:0.85rem;padding:2rem}
 </style>
 </head>
 <body>
@@ -491,7 +523,8 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
     <p style="font-size:1rem;color:var(--dim);line-height:1.8;margin-bottom:2.5rem">
       Sans passer par une app externe. Choisis ton service, ton barbier, ton créneau — directement sur notre site. Simple, rapide, sans frais cachés.
     </p>
-    <div class="reviews">
+    <div class="reviews" id="reviews-dynamic">
+      <!-- Avis fictifs affichés tant que les vrais ne sont pas chargés -->
       <div class="review">
         <div class="r-stars">★★★★★</div>
         <p class="r-txt">« Barbara est incroyable. Rasage impeccable, service au-delà des attentes. »</p>
@@ -555,6 +588,27 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
   </div>
 </section>
 
+<!-- SECTION AVIS -->
+<section class="avis-section">
+  <div class="container">
+    <p class="section-sub">CE QUE DISENT NOS CLIENTS</p>
+    <h2 class="section-title">AVIS <span class="gold">VÉRIFIÉS</span></h2>
+    <div class="avis-moyenne" id="avis-moyenne">
+      <div class="note" id="avis-note-moy">—</div>
+      <div class="etoiles" id="avis-etoiles-moy">☆☆☆☆☆</div>
+      <div class="nb" id="avis-nb">Chargement...</div>
+    </div>
+    <div class="carousel-wrap">
+      <div class="carousel-track" id="carousel-track"></div>
+    </div>
+    <div class="carousel-arrows">
+      <button class="carousel-arrow" onclick="carouselPrev()">‹</button>
+      <button class="carousel-arrow" onclick="carouselNext()">›</button>
+    </div>
+    <div class="carousel-nav" id="carousel-nav"></div>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer>
   <!-- Google Maps pleine largeur -->
@@ -599,5 +653,97 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
   </div>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(async function() {
+  const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Charger les 3 meilleurs avis pour la section "Réserve ta place"
+  const {data:topAvis} = await sb.from('avis')
+    .select('note,commentaire,barbier')
+    .eq('afficher', true)
+    .gte('note', 4)
+    .not('commentaire', 'is', null)
+    .order('note', {ascending:false})
+    .limit(20);
+
+  if(topAvis && topAvis.length >= 1) {
+    const choisis = topAvis.sort(()=>Math.random()-0.5).slice(0,3);
+    const stars = n => '★'.repeat(n) + '☆'.repeat(5-n);
+    document.getElementById('reviews-dynamic').innerHTML = choisis.map(a=>`
+      <div class="review">
+        <div class="r-stars">${stars(a.note)}</div>
+        <p class="r-txt">« ${a.commentaire} »</p>
+        <span class="r-name">— Client vérifié ✓</span>
+      </div>`).join('');
+  }
+
+  const {data:avis} = await sb.from('avis')
+    .select('note,commentaire,barbier,created_at')
+    .eq('afficher', true)
+    .order('note', {ascending:false})
+    .order('created_at', {ascending:false})
+    .limit(20);
+
+  if(!avis || avis.length === 0) {
+    document.getElementById('carousel-track').innerHTML =
+      '<div class="avis-empty">Soyez parmi les premiers à laisser un avis !</div>';
+    document.getElementById('avis-nb').textContent = 'Aucun avis pour le moment';
+    return;
+  }
+
+  // Moyenne
+  const moy = (avis.reduce((s,a)=>s+a.note,0)/avis.length).toFixed(1);
+  const etoiles = n => '⭐'.repeat(Math.round(n));
+  document.getElementById('avis-note-moy').textContent = moy;
+  document.getElementById('avis-etoiles-moy').textContent = etoiles(Math.round(moy));
+  document.getElementById('avis-nb').textContent = `Basé sur ${avis.length} avis vérifiés`;
+
+  // Cartes
+  const track = document.getElementById('carousel-track');
+  const nav   = document.getElementById('carousel-nav');
+  let current = 0;
+  const perPage = window.innerWidth < 768 ? 1 : 3;
+
+  avis.forEach((a,i) => {
+    const date = new Date(a.created_at).toLocaleDateString('fr-CA',{month:'long',year:'numeric'});
+    const card = document.createElement('div');
+    card.className = 'avis-card';
+    card.innerHTML = `
+      <div class="stars">${'⭐'.repeat(a.note)}</div>
+      ${a.commentaire
+        ? `<div class="comment">"${a.commentaire}"</div>`
+        : `<div class="comment" style="color:rgba(245,240,232,0.3)">Client satisfait</div>`}
+      <div class="barbier-tag">✂ ${a.barbier}</div>
+      <div class="date-tag">${date}</div>`;
+    track.appendChild(card);
+  });
+
+  // Dots
+  const pages = Math.ceil(avis.length / perPage);
+  for(let i=0; i<pages; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'carousel-dot' + (i===0?' active':'');
+    dot.onclick = () => goTo(i);
+    nav.appendChild(dot);
+  }
+
+  function goTo(page) {
+    current = Math.max(0, Math.min(page, pages-1));
+    const cardW = 320 + 24; // width + gap
+    track.style.transform = `translateX(-${current * perPage * cardW}px)`;
+    document.querySelectorAll('.carousel-dot').forEach((d,i)=>
+      d.classList.toggle('active', i===current));
+  }
+
+  window.carouselNext = () => goTo(current+1 >= pages ? 0 : current+1);
+  window.carouselPrev = () => goTo(current-1 < 0 ? pages-1 : current-1);
+
+  // Auto-scroll toutes les 4s
+  setInterval(() => carouselNext(), 4000);
+})();
+</script>
 </body>
 </html>
