@@ -219,10 +219,6 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .cal-slot .slot-badge{font-size:0.6rem;letter-spacing:1px;padding:0.1rem 0.4rem;border-radius:2px}
 .cal-slot.free .slot-badge{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
 .cal-slot.booked .slot-badge{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
-.cal-slot.pause{background:rgba(201,168,76,0.06);border-left:3px solid rgba(201,168,76,0.4);cursor:pointer;transition:all 0.2s}
-.cal-slot.pause:hover{background:rgba(201,168,76,0.15);border-left-color:var(--gold)}
-.cal-slot.pause .slot-time{color:rgba(201,168,76,0.6)}
-.cal-slot.pause .slot-badge{background:rgba(201,168,76,0.1);color:rgba(201,168,76,0.7);border:1px solid rgba(201,168,76,0.3);font-size:0.6rem}
 
 /* TOAST */
 .toast{position:fixed;bottom:2rem;right:2rem;background:var(--charcoal);
@@ -239,6 +235,18 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
   text-transform:uppercase;margin-bottom:0.3rem}
 .note-entry .txt{color:var(--dim);line-height:1.5}
 
+/* AVIS */
+.avis-card{background:var(--charcoal);border:1px solid var(--gold4);padding:1.2rem;
+  margin-bottom:0.8rem;position:relative}
+.avis-card.masque{opacity:0.4}
+.avis-stars{font-size:1.1rem;margin-bottom:0.4rem;letter-spacing:2px}
+.avis-comment{font-size:0.85rem;color:var(--dim);line-height:1.6;margin:0.5rem 0}
+.avis-meta{font-size:0.72rem;color:var(--dim2);display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.5rem}
+.avis-actions{position:absolute;top:0.8rem;right:0.8rem;display:flex;gap:0.4rem}
+.avis-btn{background:none;border:1px solid var(--gold4);color:var(--dim2);
+  padding:0.25rem 0.6rem;font-size:0.68rem;cursor:pointer;letter-spacing:1px}
+.avis-btn:hover{border-color:var(--gold);color:var(--gold)}
+.avis-btn.danger:hover{border-color:var(--red);color:var(--red)}
 /* STATS */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
 .stat-big{background:var(--charcoal);border:1px solid var(--gold4);padding:1.4rem;position:relative;overflow:hidden}
@@ -361,6 +369,9 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       </div>
       <div class="nav-item" onclick="showTab('stats')" id="nav-stats">
         <span class="ico">📈</span>Statistiques
+      </div>
+      <div class="nav-item" onclick="showTab('avis')" id="nav-avis">
+        <span class="ico">⭐</span>Avis clients
       </div>
     </div>
 
@@ -559,6 +570,36 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         <div id="stats-content">
           <div class="empty">Chargement des statistiques...</div>
         </div>
+      </div>
+
+    </div>
+
+      <!-- TAB: AVIS CLIENTS -->
+      <div class="tab" id="tab-avis">
+        <div class="sec-head">
+          <h2>Avis <span>clients</span></h2>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <select id="avis-filter-barbier" onchange="loadAvis()"
+              style="background:var(--charcoal);border:1px solid var(--gold4);color:var(--dim);
+              padding:0.4rem 0.8rem;font-size:0.75rem">
+              <option value="">Tous les barbiers</option>
+            </select>
+            <select id="avis-filter-note" onchange="loadAvis()"
+              style="background:var(--charcoal);border:1px solid var(--gold4);color:var(--dim);
+              padding:0.4rem 0.8rem;font-size:0.75rem">
+              <option value="">Toutes les notes</option>
+              <option value="5">⭐⭐⭐⭐⭐ 5 étoiles</option>
+              <option value="4">⭐⭐⭐⭐ 4 étoiles</option>
+              <option value="3">⭐⭐⭐ 3 étoiles</option>
+              <option value="2">⭐⭐ 2 étoiles</option>
+              <option value="1">⭐ 1 étoile</option>
+            </select>
+          </div>
+        </div>
+        <!-- KPI Avis -->
+        <div id="avis-kpi" class="stats-grid" style="margin-bottom:1.5rem"></div>
+        <!-- Liste des avis -->
+        <div id="avis-list"></div>
       </div>
 
     </div>
@@ -1141,6 +1182,88 @@ function initApp() {
     now.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
   loadAll();
   initRealtime();
+}
+
+// ═══════════════════════════════════════════
+// AVIS CLIENTS
+// ═══════════════════════════════════════════
+async function loadAvis() {
+  document.getElementById('nav-avis').classList.add('active');
+  const barbierFilter = document.getElementById('avis-filter-barbier')?.value || '';
+  const noteFilter    = document.getElementById('avis-filter-note')?.value || '';
+
+  let query = sb.from('avis').select('*, reservations(date_rdv,heure_rdv)').order('created_at', {ascending:false});
+  if(barbierFilter) query = query.eq('barbier', barbierFilter);
+  if(noteFilter)    query = query.eq('note', parseInt(noteFilter));
+
+  const {data:avisList} = await query;
+  const avis = avisList || [];
+
+  const total = avis.length;
+  const moy = total>0 ? (avis.reduce((s,a)=>s+a.note,0)/total).toFixed(1) : '—';
+  const cinq = avis.filter(a=>a.note===5).length;
+  const negatifs = avis.filter(a=>a.note<=2).length;
+
+  document.getElementById('avis-kpi').innerHTML = `
+    <div class="stat-big">
+      <div class="sb-val">${total}</div>
+      <div class="sb-lbl">Avis total</div>
+    </div>
+    <div class="stat-big green">
+      <div class="sb-val">${moy} ⭐</div>
+      <div class="sb-lbl">Note moyenne</div>
+    </div>
+    <div class="stat-big">
+      <div class="sb-val">${cinq}</div>
+      <div class="sb-lbl">Avis 5 étoiles</div>
+      <div class="sb-sub">${total>0?Math.round(cinq/total*100):0}% des avis</div>
+    </div>
+    <div class="stat-big red">
+      <div class="sb-val">${negatifs}</div>
+      <div class="sb-lbl">Avis négatifs</div>
+      <div class="sb-sub">Notes 1-2 étoiles</div>
+    </div>`;
+
+  const sel = document.getElementById('avis-filter-barbier');
+  if(sel && sel.options.length<=1) {
+    const barbiers = [...new Set(avis.map(a=>a.barbier))];
+    barbiers.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o);});
+  }
+
+  if(avis.length===0) {
+    document.getElementById('avis-list').innerHTML = '<div class="empty">Aucun avis pour le moment.</div>';
+    return;
+  }
+
+  const starsHtml = n => '⭐'.repeat(n) + '☆'.repeat(5-n);
+  document.getElementById('avis-list').innerHTML = avis.map(a=>`
+    <div class="avis-card ${a.afficher?'':'masque'}" id="avis-${a.id}">
+      <div class="avis-actions">
+        <button class="avis-btn ${a.afficher?'danger':''}" onclick="toggleAvis('${a.id}',${!a.afficher})">
+          ${a.afficher?'Masquer':'Afficher'}
+        </button>
+        <button class="avis-btn danger" onclick="deleteAvis('${a.id}')">Supprimer</button>
+      </div>
+      <div class="avis-stars">${starsHtml(a.note)}</div>
+      <div style="font-size:0.82rem;font-weight:600;color:var(--gold);margin-bottom:0.3rem">${a.barbier}</div>
+      ${a.commentaire?`<div class="avis-comment">"${a.commentaire}"</div>`:'<div class="avis-comment" style="font-style:italic;color:var(--dim2)">Aucun commentaire</div>'}
+      <div class="avis-meta">
+        <span>📅 ${a.reservations?.date_rdv||'—'}</span>
+        <span style="color:${a.afficher?'var(--green)':'var(--red)'}">${a.afficher?'✅ Visible':'🚫 Masqué'}</span>
+      </div>
+    </div>`).join('');
+}
+
+async function toggleAvis(id, afficher) {
+  await sb.from('avis').update({afficher}).eq('id',id);
+  loadAvis();
+}
+
+async function deleteAvis(id) {
+  if(!confirm('Supprimer cet avis définitivement ?')) return;
+  await sb.from('avis').delete().eq('id',id);
+  document.getElementById('avis-'+id)?.remove();
+  showToast('Avis supprimé');
 }
 
 function initRealtime() {
@@ -1825,6 +1948,7 @@ function showTab(name) {
   if(name==='collaborateurs') loadCollabsTab();
   if(name==='calendrier') { loadCalendrier(); return; }
   if(name==='stats') { loadStats(); return; }
+  if(name==='avis') { loadAvis(); return; }
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='calendrier') loadCalendrier();
   if(name==='horaires') loadIndisponibilites();
@@ -2308,33 +2432,15 @@ async function loadCalendrier(dateStr) {
   // Colonne par collaborateur
   calGrid.style.gridTemplateColumns = collabs.map(()=>'1fr').join(' ');
 
-  // Charger les réservations, indisponibilités et horaires collaborateurs
-  const [indiResp, horairesResp, exceptionsResp, ...resaResps] = await Promise.all([
+  // Charger les réservations et indisponibilités pour tous les collaborateurs
+  const [indiResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
-    sb.from('horaires_collaborateurs').select('*').in('barbier', collabs.map(c=>c.nom)),
-    sb.from('horaires_exceptions').select('*').eq('actif',true)
-      .lte('date_debut',dateStr).gte('date_fin',dateStr),
     ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,clients(prenom,nom)')
       .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
   ]);
   const indis = indiResp.data||[];
-  const horairesData = horairesResp.data||[];
-  const exceptionsData = exceptionsResp.data||[];
 
-  // Fonction pour obtenir horaires + pauses d'un collaborateur ce jour
-  function getCollabHoraires(nomCollab) {
-    // Vérifier exception de période en premier
-    const exc = exceptionsData.find(e=>e.barbier===nomCollab);
-    if(exc) return {debut:exc.debut, fin:exc.fin, pauses: typeof exc.pauses==='string'?JSON.parse(exc.pauses):(exc.pauses||[])};
-    // Horaire standard du jour
-    const h = horairesData.find(r=>r.barbier===nomCollab && parseInt(r.dow)===dow);
-    if(h && h.actif) return {debut:h.debut, fin:h.fin, pauses: typeof h.pauses==='string'?JSON.parse(h.pauses):(h.pauses||[])};
-    return null;
-  }
-
-  function toM(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
-
-  // Générer les slots pour ce jour selon les horaires réels du collaborateur
+  // Générer les slots pour ce jour (ex: 30min steps)
   const slotStep = 30;
   const startH = isSat?8:9, endH = isSat?12:(dow>=4?20:17);
   const allSlots=[];
@@ -2346,30 +2452,11 @@ async function loadCalendrier(dateStr) {
     const isBlocked = indis.some(i=>i.barbier===c.nom||i.barbier==='Tous');
     const count = isBlocked ? '🔴 Indisponible' : `${Object.keys(booked).length} RDV · ${allSlots.filter(t=>!booked[t]).length} libres`;
 
-    // Obtenir les pauses du collaborateur ce jour
-    const collabH = getCollabHoraires(c.nom);
-    const pauses = collabH?.pauses || [];
-
-    // Générer les slots selon les horaires réels du collab
-    const collabSlots = collabH
-      ? (()=>{
-          const slots=[];
-          for(let m=toM(collabH.debut);m<toM(collabH.fin);m+=slotStep)
-            slots.push((Math.floor(m/60)+'').padStart(2,'0')+':'+(m%60+'').padStart(2,'0'));
-          return slots;
-        })()
-      : allSlots;
-
     const slotsHtml = isBlocked
       ? `<div style="padding:2rem;text-align:center;color:var(--red)">🔴 <strong>Indisponible</strong><br>
           <span style="font-size:0.78rem;color:var(--dim2)">${indis.find(i=>i.barbier===c.nom||i.barbier==='Tous')?.raison||'Congé'}</span></div>`
-      : collabSlots.map(t => {
+      : allSlots.map(t => {
           const r = booked[t];
-          const tM = toM(t);
-
-          // Vérifier si ce slot est dans une pause
-          const inPause = pauses.find(p => tM >= toM(p.debut) && tM < toM(p.fin));
-
           if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
             const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
@@ -2377,16 +2464,6 @@ async function loadCalendrier(dateStr) {
               <span class="slot-time">${t}</span>
               <div class="slot-info"><div class="slot-name">${nom}</div><div class="slot-svc">${svc}</div></div>
               <span class="slot-badge">RDV</span></div>`;
-          } else if(inPause) {
-            // Slot en pause — cliquable pour RDV urgent
-            return `<div class="cal-slot pause" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')"
-              title="Pause ${inPause.debut}–${inPause.fin} · Cliquer pour RDV urgent">
-              <span class="slot-time">${t}</span>
-              <div class="slot-info">
-                <div style="font-size:0.75rem;color:rgba(201,168,76,0.6)">☕ Pause ${inPause.debut}–${inPause.fin}</div>
-                <div style="font-size:0.68rem;color:var(--dim2)">Cliquer pour RDV urgent</div>
-              </div>
-              <span class="slot-badge">☕ RDV?</span></div>`;
           } else {
             return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')">
               <span class="slot-time">${t}</span>
