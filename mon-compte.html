@@ -197,4 +197,161 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
       <div id="avis-list"></div>
     </div>
 
-    
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let clientData = null;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 3000);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    const tabs = ['rdv','historique','profil','avis'];
+    b.classList.toggle('active', tabs[i]===name);
+  });
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+async function init() {
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session) { window.location.href = '/compte.html'; return; }
+
+  // Chercher le client par auth_user_id
+  let {data:client} = await sb.from('clients')
+    .select('*').eq('auth_user_id', session.user.id).maybeSingle();
+
+  // Fallback : chercher par email si auth_user_id pas encore lié
+  if(!client) {
+    const {data:byEmail} = await sb.from('clients')
+      .select('*').eq('email', session.user.email).maybeSingle();
+    if(byEmail) {
+      await sb.from('clients').update({auth_user_id: session.user.id}).eq('id', byEmail.id);
+      client = byEmail;
+    }
+  }
+
+  // Créer un profil minimal si introuvable
+  if(!client) {
+    const meta = session.user.user_metadata || {};
+    const {data:newClient} = await sb.from('clients').insert({
+      prenom: meta.prenom || session.user.email.split('@')[0],
+      nom: meta.nom || '',
+      telephone: meta.tel || '',
+      email: session.user.email,
+      auth_user_id: session.user.id
+    }).select().single();
+    client = newClient;
+  }
+
+  if(!client) { window.location.href = '/compte.html'; return; }
+  clientData = client;
+
+  const initiales = ((client.prenom||'?')[0] + (client.nom||'?')[0]).toUpperCase();
+  document.getElementById('avatar-initiales').textContent = initiales;
+  document.getElementById('profil-nom').textContent = `${client.prenom||''} ${client.nom||''}`.trim();
+  document.getElementById('profil-email').textContent = session.user.email;
+  document.getElementById('profil-tel').textContent = client.telephone ? `📞 ${client.telephone}` : '';
+  document.getElementById('nav-user-name').textContent = client.prenom||'';
+  document.getElementById('edit-prenom').value = client.prenom||'';
+  document.getElementById('edit-nom').value = client.nom||'';
+  document.getElementById('edit-tel').value = client.telephone||'';
+  document.getElementById('edit-email').value = session.user.email||'';
+
+  await Promise.all([loadRDV(), loadAvis()]);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+}
+
+async function loadRDV() {
+  const today = new Date().toISOString().split('T')[0];
+  const {data:resas} = await sb.from('reservations').select('*')
+    .eq('client_id', clientData.id).order('date_rdv',{ascending:false});
+  const upcoming = (resas||[]).filter(r=>r.date_rdv>=today&&r.statut==='confirmé');
+  const history  = (resas||[]).filter(r=>r.date_rdv<today||r.statut==='annulé');
+
+  const upEl = document.getElementById('rdv-upcoming-list');
+  upEl.innerHTML = !upcoming.length
+    ? `<div class="empty"><div class="empty-icon">📅</div><p>Aucun rendez-vous à venir</p></div>`
+    : upcoming.map(r=>{
+        const dl = new Date(r.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+        const canCancel = (new Date(r.date_rdv+'T'+r.heure_rdv)-new Date())>24*60*60*1000;
+        return `<div class="rdv-card upcoming">
+          <div class="rdv-header"><div class="rdv-date">${dl}</div><span class="rdv-badge badge-confirme">Confirmé</span></div>
+          <div class="rdv-details">
+            <span>🕐 ${r.heure_rdv?.substring(0,5)}</span><span>✂ ${r.barbier}</span>
+            <span>💈 ${r.service}</span><span style="color:var(--gold)">💰 ${r.prix}</span>
+          </div>
+          ${r.cancel_token?`<div class="rdv-actions">
+            <a href="/modify?token=${r.cancel_token}&id=${r.id}" class="btn-sm-gold">✏️ Modifier</a>
+            ${canCancel?`<a href="/cancel?token=${r.cancel_token}&id=${r.id}" class="btn-sm-red">✕ Annuler</a>`:''}
+          </div>`:''}
+        </div>`;
+      }).join('');
+
+  const histEl = document.getElementById('rdv-history-list');
+  histEl.innerHTML = !history.length
+    ? `<div class="empty"><div class="empty-icon">📋</div><p>Aucun historique</p></div>`
+    : history.slice(0,20).map(r=>{
+        const dl = new Date(r.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+        const bc = r.statut==='annulé'?'badge-annule':'badge-passe';
+        const bl = r.statut==='annulé'?'Annulé':'Complété';
+        return `<div class="rdv-card past">
+          <div class="rdv-header"><div class="rdv-date">${dl}</div><span class="rdv-badge ${bc}">${bl}</span></div>
+          <div class="rdv-details">
+            <span>🕐 ${r.heure_rdv?.substring(0,5)}</span><span>✂ ${r.barbier}</span>
+            <span>💈 ${r.service}</span><span style="color:var(--gold)">💰 ${r.prix}</span>
+          </div>
+        </div>`;
+      }).join('');
+}
+
+async function loadAvis() {
+  const {data:avisList} = await sb.from('avis').select('*')
+    .eq('client_id', clientData.id).order('created_at',{ascending:false});
+  const el = document.getElementById('avis-list');
+  if(!avisList||!avisList.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⭐</div><p>Vous n'avez pas encore laissé d'avis</p></div>`;
+    return;
+  }
+  const st = n=>'⭐'.repeat(n)+'☆'.repeat(5-n);
+  el.innerHTML = avisList.map(a=>`
+    <div class="avis-card">
+      <div class="avis-stars">${st(a.note)}</div>
+      <div style="font-size:0.82rem;color:var(--gold);margin-bottom:0.3rem">✂ ${a.barbier}</div>
+      ${a.commentaire?`<div class="avis-comment">"${a.commentaire}"</div>`:''}
+      <div class="avis-meta">${new Date(a.created_at).toLocaleDateString('fr-CA',{day:'numeric',month:'long',year:'numeric'})}</div>
+    </div>`).join('');
+}
+
+async function sauvegarderProfil() {
+  const prenom = document.getElementById('edit-prenom').value.trim();
+  const nom    = document.getElementById('edit-nom').value.trim();
+  const tel    = document.getElementById('edit-tel').value.trim();
+  if(!prenom||!nom) { showToast('Prénom et nom obligatoires'); return; }
+  await sb.from('clients').update({prenom,nom,telephone:tel.replace(/\D/g,'')}).eq('id',clientData.id);
+  document.getElementById('profil-nom').textContent = `${prenom} ${nom}`;
+  document.getElementById('avatar-initiales').textContent = (prenom[0]+nom[0]).toUpperCase();
+  showToast('✅ Profil mis à jour');
+}
+
+async function deconnecter() {
+  await sb.auth.signOut();
+  window.location.href = '/compte.html';
+}
+
+init();
+</script>
+</body>
+</html>
