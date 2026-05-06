@@ -96,6 +96,25 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
 .avis-stars{font-size:1.1rem;letter-spacing:2px;margin-bottom:0.4rem}
 .avis-comment{font-size:0.85rem;color:var(--dim);font-style:italic;margin-bottom:0.4rem}
 .avis-meta{font-size:0.72rem;color:var(--dim2)}
+.btn-sm-avis{background:rgba(201,168,76,0.08);color:var(--gold);border:1px solid var(--gold4);
+  padding:0.4rem 0.9rem;font-size:0.72rem;font-family:"Barlow",sans-serif;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+.btn-sm-avis:hover{background:var(--gold3)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:1rem;display:none}
+.modal-box{background:var(--charcoal);border:1px solid var(--gold4);
+  max-width:440px;width:100%;padding:2rem;position:relative}
+.modal-box::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold)}
+.modal-close{position:absolute;top:0.8rem;right:0.8rem;background:none;border:none;
+  color:var(--dim2);font-size:1.2rem;cursor:pointer}
+.modal-close:hover{color:var(--white)}
+.star-pick{display:flex;justify-content:center;gap:0.6rem;margin:1rem 0}
+.star-pick span{font-size:2.2rem;cursor:pointer;filter:grayscale(1);opacity:0.3;transition:all 0.15s;user-select:none}
+.star-pick span.on{filter:none;opacity:1;transform:scale(1.1)}
+.modal-textarea{width:100%;background:rgba(245,240,232,0.04);border:1px solid var(--gold4);
+  color:var(--white);font-family:"Barlow",sans-serif;font-size:0.87rem;
+  padding:0.8rem;resize:none;height:90px;outline:none;margin-bottom:1rem}
+.modal-textarea:focus{border-color:var(--gold)}
 
 
 
@@ -200,6 +219,25 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
   </div>
 </div>
 
+<!-- MODAL AVIS -->
+<div class="modal-overlay" id="modal-avis" onclick="if(event.target===this)fermerModalAvis()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="fermerModalAvis()">✕</button>
+    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--gold);margin-bottom:0.3rem">Laisser un avis</h3>
+    <p id="modal-avis-rdv" style="font-size:0.78rem;color:var(--dim2);margin-bottom:0.5rem"></p>
+    <div class="star-pick" id="star-pick">
+      <span onclick="setStarPick(1)">⭐</span>
+      <span onclick="setStarPick(2)">⭐</span>
+      <span onclick="setStarPick(3)">⭐</span>
+      <span onclick="setStarPick(4)">⭐</span>
+      <span onclick="setStarPick(5)">⭐</span>
+    </div>
+    <p id="star-desc" style="text-align:center;font-size:0.78rem;color:var(--gold);height:1rem;margin-bottom:0.8rem"></p>
+    <textarea class="modal-textarea" id="modal-commentaire" placeholder="Votre commentaire (optionnel)..."></textarea>
+    <button class="btn-save" style="width:100%" onclick="soumettreAvis()">★ Envoyer mon avis</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -300,6 +338,10 @@ async function loadRDV() {
         </div>`;
       }).join('');
 
+  // Charger les avis déjà donnés pour cacher le bouton
+  const {data:avisExist} = await sb.from('avis').select('reservation_id').eq('client_id',clientData.id);
+  const avisIds = new Set((avisExist||[]).map(a=>a.reservation_id));
+
   const histEl = document.getElementById('rdv-history-list');
   histEl.innerHTML = !history.length
     ? `<div class="empty"><div class="empty-icon">📋</div><p>Aucun historique</p></div>`
@@ -307,12 +349,16 @@ async function loadRDV() {
         const dl = new Date(r.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
         const bc = r.statut==='annulé'?'badge-annule':'badge-passe';
         const bl = r.statut==='annulé'?'Annulé':'Complété';
-        return `<div class="rdv-card past">
+        const dejaAvis = avisIds.has(r.id);
+        const peutAvis = r.statut!=='annulé' && !dejaAvis;
+        return `<div class="rdv-card past" id="rdv-${r.id}">
           <div class="rdv-header"><div class="rdv-date">${dl}</div><span class="rdv-badge ${bc}">${bl}</span></div>
           <div class="rdv-details">
             <span>🕐 ${r.heure_rdv?.substring(0,5)}</span><span>✂ ${r.barbier}</span>
             <span>💈 ${r.service}</span><span style="color:var(--gold)">💰 ${r.prix}</span>
           </div>
+          ${peutAvis ? `<div class="rdv-actions"><button class="btn-sm-avis" onclick="ouvrirModalAvis('${r.id}','${r.barbier}','${dl}')">⭐ Laisser un avis</button></div>` : ''}
+          ${dejaAvis ? '<div style="font-size:0.72rem;color:var(--gold);margin-top:0.5rem">✅ Avis donné</div>' : ''}
         </div>`;
       }).join('');
 }
@@ -349,6 +395,58 @@ async function sauvegarderProfil() {
 async function deconnecter() {
   await sb.auth.signOut();
   window.location.href = '/compte.html';
+}
+
+// ── MODAL AVIS ──
+let _modalResaId = null;
+let _modalNote = 0;
+const STAR_LABELS = ['','Mauvais 😞','Passable 😐','Bien 🙂','Très bien 😊','Excellent ! 🤩'];
+
+function ouvrirModalAvis(resaId, barbier, dateLabel) {
+  _modalResaId = resaId;
+  _modalNote = 0;
+  document.getElementById('modal-avis-rdv').textContent = barbier + ' · ' + dateLabel;
+  document.getElementById('modal-commentaire').value = '';
+  document.getElementById('star-desc').textContent = '';
+  document.querySelectorAll('.star-pick span').forEach(s=>s.classList.remove('on'));
+  document.getElementById('modal-avis').style.display = 'flex';
+}
+
+function fermerModalAvis() {
+  document.getElementById('modal-avis').style.display = 'none';
+  _modalResaId = null; _modalNote = 0;
+}
+
+function setStarPick(n) {
+  _modalNote = n;
+  document.querySelectorAll('.star-pick span').forEach((s,i)=>s.classList.toggle('on',i<n));
+  document.getElementById('star-desc').textContent = STAR_LABELS[n];
+}
+
+async function soumettreAvis() {
+  if(!_modalNote) { showToast('Choisissez une note'); return; }
+  const commentaire = document.getElementById('modal-commentaire').value.trim() || null;
+  const {error} = await sb.from('avis').insert({
+    reservation_id: _modalResaId,
+    client_id: clientData.id,
+    barbier: document.getElementById('modal-avis-rdv').textContent.split(' · ')[0],
+    note: _modalNote,
+    commentaire,
+    afficher: true
+  });
+  if(error) { showToast('Erreur — réessayez'); return; }
+  fermerModalAvis();
+  showToast('✅ Merci pour votre avis !');
+  // Mettre à jour la carte RDV
+  const rdvEl = document.getElementById('rdv-'+_modalResaId);
+  if(rdvEl) {
+    rdvEl.querySelector('.btn-sm-avis')?.remove();
+    const div = document.createElement('div');
+    div.style.cssText = 'font-size:0.72rem;color:var(--gold);margin-top:0.5rem';
+    div.textContent = '✅ Avis donné';
+    rdvEl.appendChild(div);
+  }
+  loadAvis();
 }
 
 init();
