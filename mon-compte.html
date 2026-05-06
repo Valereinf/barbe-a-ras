@@ -39,10 +39,7 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
   font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold);flex-shrink:0}
 .profile-info h2{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2px;margin-bottom:0.2rem}
 .profile-info p{font-size:0.8rem;color:var(--dim2)}
-.points-badge{margin-left:auto;text-align:center;background:var(--gold3);
-  border:1px solid var(--gold4);padding:0.8rem 1.2rem}
-.points-badge .pts{font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--gold);line-height:1}
-.points-badge .pts-lbl{font-size:0.6rem;letter-spacing:2px;color:var(--dim2);text-transform:uppercase}
+
 
 /* Tabs */
 .tabs{display:flex;border-bottom:1px solid var(--gold4);margin-bottom:1.5rem;overflow-x:auto}
@@ -100,15 +97,7 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
 .avis-comment{font-size:0.85rem;color:var(--dim);font-style:italic;margin-bottom:0.4rem}
 .avis-meta{font-size:0.72rem;color:var(--dim2)}
 
-/* Points */
-.points-section{background:var(--charcoal);border:1px solid var(--gold4);padding:1.5rem;margin-bottom:1rem}
-.points-history{margin-top:1rem}
-.points-row{display:flex;justify-content:space-between;padding:0.5rem 0;
-  border-bottom:1px solid rgba(201,168,76,0.07);font-size:0.83rem}
-.points-row:last-child{border-bottom:none}
-.points-gain{color:var(--green);font-weight:600}
-.points-total-bar{background:var(--gold3);border:1px solid var(--gold4);
-  padding:1rem;text-align:center;margin-bottom:1rem}
+
 
 /* Empty state */
 .empty{text-align:center;padding:3rem;color:var(--dim2);font-size:0.85rem}
@@ -146,10 +135,7 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
         <p id="profil-email">—</p>
         <p id="profil-tel" style="margin-top:2px">—</p>
       </div>
-      <div class="points-badge">
-        <div class="pts" id="pts-total">0</div>
-        <div class="pts-lbl">Points fidélité</div>
-      </div>
+
     </div>
 
     <!-- Tabs -->
@@ -158,7 +144,7 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
       <button class="tab-btn" onclick="switchTab('historique')">📋 Historique</button>
       <button class="tab-btn" onclick="switchTab('profil')">👤 Mon profil</button>
       <button class="tab-btn" onclick="switchTab('avis')">⭐ Mes avis</button>
-      <button class="tab-btn" onclick="switchTab('fidelite')">🎁 Fidélité</button>
+
     </div>
 
     <!-- TAB: RDV À VENIR -->
@@ -211,242 +197,4 @@ nav{height:64px;display:flex;align-items:center;justify-content:space-between;
       <div id="avis-list"></div>
     </div>
 
-    <!-- TAB: FIDÉLITÉ -->
-    <div class="tab-content" id="tab-fidelite">
-      <div class="points-total-bar">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--gold)" id="pts-fidelite-grand">0</div>
-        <div style="font-size:0.7rem;letter-spacing:2px;color:var(--dim2)">POINTS ACCUMULÉS</div>
-      </div>
-      <div class="points-section">
-        <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold);margin-bottom:1rem">
-          Comment ça fonctionne
-        </h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:0.83rem">
-          <div style="background:var(--gold3);border:1px solid var(--gold4);padding:0.8rem">
-            <div style="font-size:1.5rem;margin-bottom:0.3rem">✂</div>
-            <strong>1 visite = 10 points</strong>
-            <div style="font-size:0.75rem;color:var(--dim2);margin-top:4px">Chaque RDV complété</div>
-          </div>
-          <div style="background:var(--gold3);border:1px solid var(--gold4);padding:0.8rem">
-            <div style="font-size:1.5rem;margin-bottom:0.3rem">⭐</div>
-            <strong>Avis = 5 points bonus</strong>
-            <div style="font-size:0.75rem;color:var(--dim2);margin-top:4px">Pour chaque avis laissé</div>
-          </div>
-          <div style="background:var(--gold3);border:1px solid var(--gold4);padding:0.8rem">
-            <div style="font-size:1.5rem;margin-bottom:0.3rem">🎁</div>
-            <strong>50 points = 5$ de rabais</strong>
-            <div style="font-size:0.75rem;color:var(--dim2);margin-top:4px">À votre prochain RDV</div>
-          </div>
-          <div style="background:var(--gold3);border:1px solid var(--gold4);padding:0.8rem">
-            <div style="font-size:1.5rem;margin-bottom:0.3rem">👑</div>
-            <strong>100 pts = Client VIP</strong>
-            <div style="font-size:0.75rem;color:var(--dim2);margin-top:4px">Priorité de réservation</div>
-          </div>
-        </div>
-      </div>
-      <div class="points-section">
-        <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold);margin-bottom:1rem">
-          Historique des points
-        </h3>
-        <div id="points-history-list"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let clientData = null;
-let session = null;
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.style.display = 'block';
-  setTimeout(()=>t.style.display='none', 3000);
-}
-
-function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-    const tabs = ['rdv','historique','profil','avis','fidelite'];
-    b.classList.toggle('active', tabs[i]===name);
-  });
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-}
-
-async function init() {
-  const {data:{session:s}} = await sb.auth.getSession();
-  if(!s) { window.location.href = '/compte.html'; return; }
-  session = s;
-
-  // Charger le profil client
-  const {data:client} = await sb.from('clients')
-    .select('*')
-    .eq('auth_user_id', s.user.id)
-    .single();
-
-  if(!client) { window.location.href = '/compte.html'; return; }
-  clientData = client;
-
-  // Afficher le profil
-  const initiales = (client.prenom[0]||'?') + (client.nom[0]||'');
-  document.getElementById('avatar-initiales').textContent = initiales.toUpperCase();
-  document.getElementById('profil-nom').textContent = `${client.prenom} ${client.nom}`;
-  document.getElementById('profil-email').textContent = s.user.email;
-  document.getElementById('profil-tel').textContent = client.telephone ? `📞 ${client.telephone}` : '';
-  document.getElementById('nav-user-name').textContent = client.prenom;
-  document.getElementById('pts-total').textContent = client.points_fidelite||0;
-  document.getElementById('pts-fidelite-grand').textContent = client.points_fidelite||0;
-
-  // Pré-remplir le formulaire profil
-  document.getElementById('edit-prenom').value = client.prenom||'';
-  document.getElementById('edit-nom').value = client.nom||'';
-  document.getElementById('edit-tel').value = client.telephone||'';
-  document.getElementById('edit-email').value = s.user.email||'';
-
-  // Charger les données
-  await Promise.all([loadRDV(), loadAvis(), loadPointsHistory()]);
-
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('main-content').style.display = 'block';
-}
-
-async function loadRDV() {
-  const today = new Date().toISOString().split('T')[0];
-  const {data:resas} = await sb.from('reservations')
-    .select('*')
-    .eq('client_id', clientData.id)
-    .order('date_rdv', {ascending:false});
-
-  const upcoming = (resas||[]).filter(r=>r.date_rdv>=today&&r.statut==='confirmé');
-  const history  = (resas||[]).filter(r=>r.date_rdv<today||r.statut==='annulé');
-
-  // RDV à venir
-  const upEl = document.getElementById('rdv-upcoming-list');
-  if(!upcoming.length) {
-    upEl.innerHTML = `<div class="empty"><div class="empty-icon">📅</div>
-      <p>Aucun rendez-vous à venir</p>
-      <a href="booking.html" style="color:var(--gold);margin-top:0.5rem;display:inline-block">Prendre un RDV →</a></div>`;
-  } else {
-    upEl.innerHTML = upcoming.map(r => {
-      const dateLabel = new Date(r.date_rdv+'T12:00:00')
-        .toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-      const canCancel = (new Date(r.date_rdv+'T'+r.heure_rdv) - new Date()) > 24*60*60*1000;
-      return `<div class="rdv-card upcoming">
-        <div class="rdv-header">
-          <div class="rdv-date">${dateLabel}</div>
-          <span class="rdv-badge badge-confirme">Confirmé</span>
-        </div>
-        <div class="rdv-details">
-          <span>🕐 ${r.heure_rdv?.substring(0,5)}</span>
-          <span>✂ ${r.barbier}</span>
-          <span>💈 ${r.service}</span>
-          <span style="color:var(--gold)">💰 ${r.prix}</span>
-        </div>
-        ${r.cancel_token ? `<div class="rdv-actions">
-          <a href="/modify?token=${r.cancel_token}&id=${r.id}" class="btn-sm-gold">✏️ Modifier</a>
-          ${canCancel ? `<a href="/cancel?token=${r.cancel_token}&id=${r.id}" class="btn-sm-red">✕ Annuler</a>` : ''}
-        </div>` : ''}
-      </div>`;
-    }).join('');
-  }
-
-  // Historique
-  const histEl = document.getElementById('rdv-history-list');
-  if(!history.length) {
-    histEl.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><p>Aucun historique</p></div>`;
-  } else {
-    histEl.innerHTML = history.slice(0,20).map(r => {
-      const dateLabel = new Date(r.date_rdv+'T12:00:00')
-        .toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-      const badgeClass = r.statut==='annulé' ? 'badge-annule' : 'badge-passe';
-      const badgeLabel = r.statut==='annulé' ? 'Annulé' : 'Complété';
-      return `<div class="rdv-card past">
-        <div class="rdv-header">
-          <div class="rdv-date">${dateLabel}</div>
-          <span class="rdv-badge ${badgeClass}">${badgeLabel}</span>
-        </div>
-        <div class="rdv-details">
-          <span>🕐 ${r.heure_rdv?.substring(0,5)}</span>
-          <span>✂ ${r.barbier}</span>
-          <span>💈 ${r.service}</span>
-          <span style="color:var(--gold)">💰 ${r.prix}</span>
-        </div>
-      </div>`;
-    }).join('');
-  }
-}
-
-async function loadAvis() {
-  const {data:avisList} = await sb.from('avis')
-    .select('*')
-    .eq('client_id', clientData.id)
-    .order('created_at',{ascending:false});
-
-  const el = document.getElementById('avis-list');
-  if(!avisList||!avisList.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">⭐</div>
-      <p>Vous n'avez pas encore laissé d'avis</p></div>`;
-    return;
-  }
-  const st = n => '⭐'.repeat(n)+'☆'.repeat(5-n);
-  el.innerHTML = avisList.map(a=>`
-    <div class="avis-card">
-      <div class="avis-stars">${st(a.note)}</div>
-      <div style="font-size:0.82rem;color:var(--gold);margin-bottom:0.3rem">✂ ${a.barbier}</div>
-      ${a.commentaire?`<div class="avis-comment">"${a.commentaire}"</div>`:''}
-      <div class="avis-meta">${new Date(a.created_at).toLocaleDateString('fr-CA',{day:'numeric',month:'long',year:'numeric'})}</div>
-    </div>`).join('');
-}
-
-async function loadPointsHistory() {
-  // Charger les RDV complétés pour montrer l'historique des points
-  const {data:resas} = await sb.from('reservations')
-    .select('date_rdv,service,barbier')
-    .eq('client_id', clientData.id)
-    .eq('statut','confirmé')
-    .lt('date_rdv', new Date().toISOString().split('T')[0])
-    .order('date_rdv',{ascending:false})
-    .limit(10);
-
-  const el = document.getElementById('points-history-list');
-  if(!resas||!resas.length) {
-    el.innerHTML = '<div style="color:var(--dim2);font-size:0.82rem">Aucun historique de points</div>';
-    return;
-  }
-  el.innerHTML = resas.map(r=>`
-    <div class="points-row">
-      <span>${new Date(r.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{day:'numeric',month:'short'})} — ${r.service?.substring(0,30)}</span>
-      <span class="points-gain">+10 pts</span>
-    </div>`).join('');
-}
-
-async function sauvegarderProfil() {
-  const prenom = document.getElementById('edit-prenom').value.trim();
-  const nom    = document.getElementById('edit-nom').value.trim();
-  const tel    = document.getElementById('edit-tel').value.trim();
-  if(!prenom||!nom) { showToast('Prénom et nom obligatoires'); return; }
-
-  await sb.from('clients').update({prenom,nom,telephone:tel.replace(/\D/g,'')})
-    .eq('id', clientData.id);
-
-  // Mettre à jour l'affichage
-  document.getElementById('profil-nom').textContent = `${prenom} ${nom}`;
-  document.getElementById('avatar-initiales').textContent = (prenom[0]+nom[0]).toUpperCase();
-  showToast('✅ Profil mis à jour');
-}
-
-async function deconnecter() {
-  await sb.auth.signOut();
-  window.location.href = '/compte.html';
-}
-
-init();
-</script>
-</body>
-</html>
+    
