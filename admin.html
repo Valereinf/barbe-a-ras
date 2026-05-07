@@ -2891,7 +2891,8 @@ async function saveNewResa() {
   const email = document.getElementById('new-resa-email').value.trim();
   const serviceEl = document.getElementById('new-resa-service');
   const service = serviceEl.value;
-  const prix = serviceEl.options[serviceEl.selectedIndex].dataset.prix + '$';
+  const prixRaw = serviceEl.options[serviceEl.selectedIndex]?.dataset.prix;
+  const prix = prixRaw ? prixRaw + '$' : '0.00$';
   const note = document.getElementById('new-resa-note').value.trim();
 
   if(!prenom||!nom||!tel){showToast('Prénom, nom et téléphone requis','err');return;}
