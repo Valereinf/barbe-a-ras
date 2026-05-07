@@ -324,7 +324,7 @@ async function loadRDV() {
     ? `<div class="empty"><div class="empty-icon">📅</div><p>Aucun rendez-vous à venir</p></div>`
     : upcoming.map(r=>{
         const dl = new Date(r.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-        const canCancel = (new Date(r.date_rdv+'T'+r.heure_rdv)-new Date())>24*60*60*1000;
+        const canCancel = (new Date(r.date_rdv+'T'+r.heure_rdv)-new Date())>3*60*60*1000;
         return `<div class="rdv-card upcoming">
           <div class="rdv-header"><div class="rdv-date">${dl}</div><span class="rdv-badge badge-confirme">Confirmé</span></div>
           <div class="rdv-details">
