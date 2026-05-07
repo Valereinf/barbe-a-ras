@@ -66,7 +66,7 @@ p{color:var(--dim);line-height:1.7;margin-bottom:0.8rem;font-size:0.95rem}
       <div class="detail-box" id="resa-details"></div>
       <div class="warning">
         Cette action est irréversible. Conformément à la politique du salon,
-        l'annulation doit être effectuée au moins <strong>24h à l'avance</strong>.
+        l'annulation doit être effectuée au moins <strong>3h à l'avance</strong>.
       </div>
       <div>
         <button class="btn-red" onclick="doCancel()">Oui, annuler</button>
@@ -95,7 +95,7 @@ p{color:var(--dim);line-height:1.7;margin-bottom:0.8rem;font-size:0.95rem}
     <div id="screen-late" style="display:none">
       <div class="icon">⏰</div>
       <h1 style="color:var(--red)">Trop tard</h1>
-      <p>L'annulation en ligne n'est plus possible — votre rendez-vous est dans moins de 24 heures.</p>
+      <p>L'annulation en ligne n'est plus possible — votre rendez-vous est dans moins de 3 heures.</p>
       <p>Pour annuler, appelez directement le salon :</p>
       <a href="tel:4186122007" class="btn-gold">📞 (418) 612-2007</a>
     </div>
@@ -141,10 +141,10 @@ async function init() {
   if (data.cancel_token !== token) { show('error'); return; }
   if (data.statut === 'annulé') { show('already'); return; }
 
-  // Check 24h
+  // Check 3h
   const rdvDate = new Date(`${data.date_rdv}T${data.heure_rdv}`);
   const diff = (rdvDate - new Date()) / (1000*60*60);
-  if (diff < 24) { show('late'); return; }
+  if (diff < 3) { show('late'); return; }
 
   // Show details
   const dateStr = new Date(data.date_rdv+'T12:00:00')
