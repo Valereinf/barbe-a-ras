@@ -3114,6 +3114,13 @@ async function populateBarbierSelects() {
     const el = document.getElementById(id);
     if(el) { const val=el.value; el.innerHTML=opts; el.value=val||''; }
   });
+  // indi-barbier : conserver l'option "Tous" en tête + ajouter les barbiers
+  const indiSel = document.getElementById('indi-barbier');
+  if(indiSel) {
+    const val = indiSel.value;
+    indiSel.innerHTML = '<option value="Tous">Tous les deux (salon fermé)</option>' + opts;
+    indiSel.value = val || 'Tous';
+  }
 }
 
 // ═══════════════════════════════════════════
