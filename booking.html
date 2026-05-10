@@ -1317,7 +1317,20 @@ function addAnotherService(){
 async function loadBookingServices() {
   const {data:services, error} = await sb.from('services')
     .select('*').eq('actif', true).order('ordre').order('nom');
-  if(error || !services || !services.length) return;
+
+  if(error) {
+    console.error('[Services] Erreur chargement:', error.message);
+    // Fallback : afficher message d'erreur
+    const c = document.getElementById('svc-list-dynamic');
+    if(c) c.innerHTML = '<div style="padding:1rem;color:rgba(245,240,232,0.4);font-size:0.85rem">Impossible de charger les services. Actualisez la page.</div>';
+    return;
+  }
+
+  if(!services || !services.length) {
+    const c = document.getElementById('svc-list-dynamic');
+    if(c) c.innerHTML = '<div style="padding:1rem;color:rgba(245,240,232,0.4);font-size:0.85rem">Aucun service disponible pour le moment.</div>';
+    return;
+  }
 
   // Mettre à jour le durationMap dynamiquement
   services.forEach(s => { durationMap[s.nom] = s.duree; });
