@@ -1709,7 +1709,7 @@ async function openClientModal(clientId) {
       </div>
       ${clientResa.length===0?'<p style="color:var(--dim2);font-size:0.85rem">Aucun historique</p>':
         clientResa.slice(0,10).map(r=>{
-          const today = localToday();
+          const today = new Date().toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
           const isUpcoming = r.date_rdv >= today && r.statut === 'confirmé';
           return `
           <div style="border:1px solid var(--gold4);padding:0.7rem 0.9rem;margin-bottom:0.5rem;font-size:0.82rem;
