@@ -239,6 +239,19 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
   text-transform:uppercase;margin-bottom:0.3rem}
 .note-entry .txt{color:var(--dim);line-height:1.5}
 
+/* SERVICES */
+.svc-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;
+  gap:1rem;background:var(--charcoal);border:1px solid var(--gold4);padding:1rem 1.2rem;
+  margin-bottom:0.5rem;transition:border-color 0.2s}
+.svc-row:hover{border-color:var(--gold)}
+.svc-row.inactive{opacity:0.45}
+.svc-nom{font-weight:600;font-size:0.9rem;margin-bottom:0.2rem}
+.svc-meta{font-size:0.72rem;color:var(--dim2)}
+.svc-prix{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);white-space:nowrap}
+.svc-duree{font-size:0.75rem;color:var(--dim2);text-align:right}
+.svc-actions{display:flex;gap:0.4rem;flex-shrink:0}
+.badge-hors-heures{background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3);
+  font-size:0.62rem;letter-spacing:1px;padding:0.15rem 0.4rem;text-transform:uppercase;margin-left:0.4rem}
 /* AVIS */
 .avis-card{background:var(--charcoal);border:1px solid var(--gold4);padding:1.2rem;margin-bottom:0.8rem;position:relative}
 .avis-card.masque{opacity:0.4}
@@ -300,6 +313,61 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 </head>
 <body translate="no" class="notranslate">
 
+<div class="modal-bg" id="modal-service">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-head">
+      <h3 id="modal-service-title">Nouveau service</h3>
+      <button class="modal-close" onclick="closeModal('modal-service')">✕</button>
+    </div>
+    <input type="hidden" id="service-edit-id">
+    <div class="field">
+      <label>Nom du service *</label>
+      <input type="text" id="service-nom" placeholder="Ex: Coupe adulte">
+    </div>
+    <div class="field">
+      <label>Description (optionnel)</label>
+      <input type="text" id="service-desc" placeholder="Ex: Coupe classique avec finition soignée.">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="field">
+        <label>Prix ($) *</label>
+        <input type="number" id="service-prix" placeholder="29.50" step="0.50" min="0">
+      </div>
+      <div class="field">
+        <label>Durée (minutes) *</label>
+        <select id="service-duree" style="width:100%;background:var(--charcoal);border:1px solid var(--gold4);color:var(--white);padding:0.6rem 0.8rem;font-family:'Barlow',sans-serif">
+          <option value="15">15 min</option>
+          <option value="30" selected>30 min</option>
+          <option value="45">45 min</option>
+          <option value="60">60 min</option>
+          <option value="75">75 min</option>
+          <option value="90">90 min</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.5rem">
+      <div class="field" style="display:flex;align-items:center;gap:0.8rem;margin:0">
+        <label class="horaire-toggle">
+          <input type="checkbox" id="service-actif" checked>
+          <span class="horaire-toggle-slider"></span>
+        </label>
+        <label style="font-size:0.78rem;letter-spacing:1px;text-transform:uppercase;color:var(--dim2)">Actif</label>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:0.8rem;margin:0">
+        <label class="horaire-toggle">
+          <input type="checkbox" id="service-hors-heures">
+          <span class="horaire-toggle-slider"></span>
+        </label>
+        <label style="font-size:0.78rem;letter-spacing:1px;text-transform:uppercase;color:var(--dim2)">Hors heures seulement</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-sm" onclick="closeModal('modal-service')">Annuler</button>
+      <button class="btn-sm btn-gold-sm" onclick="saveService()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- LOGIN -->
@@ -359,6 +427,9 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       </div>
       <div class="nav-item" onclick="showTab('horaires')" id="nav-horaires">
         <span class="ico">🗓</span>Horaires
+      </div>
+      <div class="nav-item" onclick="showTab('services')" id="nav-services">
+        <span class="ico">💈</span>Services
       </div>
       <div class="nav-item" onclick="showTab('collaborateurs')" id="nav-collaborateurs">
         <span class="ico">✂</span>Collaborateurs
@@ -575,6 +646,18 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       </div>
 
     </div>
+
+      <!-- TAB: SERVICES -->
+      <div class="tab" id="tab-services">
+        <div class="sec-head">
+          <h2>Services <span>& Tarifs</span></h2>
+          <button class="btn-sm btn-gold-sm" onclick="openServiceModal()">+ Nouveau service</button>
+        </div>
+        <p style="font-size:0.8rem;color:var(--dim2);margin-bottom:1.5rem">
+          Les modifications sont synchronisées automatiquement avec la page de réservation en ligne.
+        </p>
+        <div id="services-list"><div class="empty">Chargement...</div></div>
+      </div>
 
       <!-- TAB: AVIS CLIENTS -->
       <div class="tab" id="tab-avis">
@@ -1319,6 +1402,123 @@ async function loadAvis() {
 async function toggleAvis(id,afficher){await sb.from('avis').update({afficher}).eq('id',id);loadAvis();}
 async function deleteAvis(id){if(!confirm('Supprimer cet avis ?'))return;await sb.from('avis').delete().eq('id',id);document.getElementById('avis-'+id)?.remove();showToast('Avis supprimé');}
 
+// ═══════════════════════════════════════════
+// SERVICES
+// ═══════════════════════════════════════════
+let allServices = [];
+
+async function loadServices() {
+  document.getElementById('nav-services').classList.add('active');
+  const {data, error} = await sb.from('services').select('*').order('ordre').order('nom');
+  if(error) { showToast('Erreur chargement services', 'error'); return; }
+  allServices = data || [];
+  renderServices();
+}
+
+function renderServices() {
+  const el = document.getElementById('services-list');
+  if(!allServices.length) {
+    el.innerHTML = '<div class="empty">Aucun service. Cliquez sur "+ Nouveau service" pour commencer.</div>';
+    return;
+  }
+  el.innerHTML = allServices.map(s => `
+    <div class="svc-row ${s.actif?'':'inactive'}" id="svc-row-${s.id}">
+      <div>
+        <div class="svc-nom">
+          ${s.nom}
+          ${s.hors_heures ? '<span class="badge-hors-heures">📞 Hors heures</span>' : ''}
+          ${!s.actif ? '<span class="badge-hors-heures" style="color:var(--dim2);border-color:var(--gold4)">Inactif</span>' : ''}
+        </div>
+        <div class="svc-meta">${s.description||'—'}</div>
+      </div>
+      <div>
+        <div class="svc-prix">${parseFloat(s.prix).toFixed(2)}$</div>
+        <div class="svc-duree">${s.duree} min</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.3rem;align-items:center">
+        <button class="avis-btn" style="font-size:0.65rem" onclick="toggleServiceActif('${s.id}',${!s.actif})">
+          ${s.actif ? '🚫 Désactiver' : '✅ Activer'}
+        </button>
+      </div>
+      <div class="svc-actions">
+        <button class="btn-sm btn-gold-sm" onclick="editService('${s.id}')">✏️ Modifier</button>
+        <button class="btn-sm" style="color:var(--red);border-color:rgba(231,76,60,0.3)" onclick="deleteService('${s.id}','${s.nom.replace(/'/g,"\\'")}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function openServiceModal() {
+  document.getElementById('modal-service-title').textContent = 'Nouveau service';
+  document.getElementById('service-edit-id').value = '';
+  document.getElementById('service-nom').value = '';
+  document.getElementById('service-desc').value = '';
+  document.getElementById('service-prix').value = '';
+  document.getElementById('service-duree').value = '30';
+  document.getElementById('service-actif').checked = true;
+  document.getElementById('service-hors-heures').checked = false;
+  document.getElementById('modal-service').classList.add('open');
+}
+
+function editService(id) {
+  const s = allServices.find(x=>x.id===id);
+  if(!s) return;
+  document.getElementById('modal-service-title').textContent = 'Modifier le service';
+  document.getElementById('service-edit-id').value = s.id;
+  document.getElementById('service-nom').value = s.nom;
+  document.getElementById('service-desc').value = s.description||'';
+  document.getElementById('service-prix').value = s.prix;
+  document.getElementById('service-duree').value = s.duree;
+  document.getElementById('service-actif').checked = s.actif;
+  document.getElementById('service-hors-heures').checked = s.hors_heures||false;
+  document.getElementById('modal-service').classList.add('open');
+}
+
+async function saveService() {
+  const id    = document.getElementById('service-edit-id').value;
+  const nom   = document.getElementById('service-nom').value.trim();
+  const desc  = document.getElementById('service-desc').value.trim()||null;
+  const prix  = parseFloat(document.getElementById('service-prix').value);
+  const duree = parseInt(document.getElementById('service-duree').value);
+  const actif = document.getElementById('service-actif').checked;
+  const hors  = document.getElementById('service-hors-heures').checked;
+
+  if(!nom) { showToast('Le nom est obligatoire', 'error'); return; }
+  if(isNaN(prix)||prix<0) { showToast('Prix invalide', 'error'); return; }
+
+  const payload = {nom, description:desc, prix, duree, actif, hors_heures:hors};
+
+  if(id) {
+    const {error} = await sb.from('services').update(payload).eq('id',id);
+    if(error) { showToast('Erreur: '+error.message, 'error'); return; }
+    showToast('✅ Service mis à jour');
+  } else {
+    const maxOrdre = allServices.length ? Math.max(...allServices.map(s=>s.ordre||0))+1 : 1;
+    const {error} = await sb.from('services').insert({...payload, ordre:maxOrdre});
+    if(error) { showToast('Erreur: '+error.message, 'error'); return; }
+    showToast('✅ Service ajouté');
+  }
+
+  closeModal('modal-service');
+  loadServices();
+}
+
+async function toggleServiceActif(id, actif) {
+  await sb.from('services').update({actif}).eq('id',id);
+  const s = allServices.find(x=>x.id===id);
+  if(s) s.actif = actif;
+  renderServices();
+  showToast(actif ? '✅ Service activé' : '🚫 Service désactivé');
+}
+
+async function deleteService(id, nom) {
+  if(!confirm(`Supprimer "${nom}" définitivement ?`)) return;
+  const {error} = await sb.from('services').delete().eq('id',id);
+  if(error) { showToast('Erreur: '+error.message, 'error'); return; }
+  allServices = allServices.filter(s=>s.id!==id);
+  renderServices();
+  showToast('🗑 Service supprimé');
+}
+
 function initRealtime() {
   // Supabase Realtime — écoute les changements en temps réel
   sb.channel('admin-sync')
@@ -2002,6 +2202,7 @@ function showTab(name) {
   if(name==='calendrier') { loadCalendrier(); return; }
   if(name==='stats') { loadStats(); return; }
   if(name==='avis') { loadAvis(); return; }
+  if(name==='services') { loadServices(); return; }
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='calendrier') loadCalendrier();
   if(name==='horaires') loadIndisponibilites();
