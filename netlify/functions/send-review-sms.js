@@ -1,35 +1,46 @@
 // netlify/functions/send-review-sms.js
 // Cron : toutes les 30 minutes — envoie les SMS d'avis 2h après chaque RDV terminé
 
-const SUPABASE_URL  = process.env.SUPABASE_URL;
-const SUPABASE_KEY  = process.env.SUPABASE_KEY;
-const TWILIO_SID    = process.env.TWILIO_SID;
-const TWILIO_TOKEN  = process.env.TWILIO_TOKEN;
-const TWILIO_PHONE  = process.env.TWILIO_PHONE;
+const SUPABASE_URL   = process.env.SUPABASE_URL;
+const SUPABASE_KEY   = process.env.SUPABASE_KEY;
+const TWILIO_SID     = process.env.TWILIO_SID;
+const TWILIO_TOKEN   = process.env.TWILIO_TOKEN;
+const TWILIO_PHONE   = process.env.TWILIO_PHONE;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const SITE_URL      = process.env.URL || 'https://barbe-a-ras.ca';
+const SITE_URL       = process.env.URL || 'https://barbe-a-ras.ca';
+
+// Convertit un objet Date en date locale Québec (YYYY-MM-DD)
+function toQuebecDate(date) {
+  return date.toLocaleDateString('en-CA', {
+    timeZone: 'America/Toronto',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+}
+
+// Convertit un objet Date en heure locale Québec (HH:MM)
+function toQuebecTime(date) {
+  return date.toLocaleTimeString('en-CA', {
+    timeZone: 'America/Toronto',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
+}
 
 exports.handler = async (event) => {
   const now = new Date();
 
-  // Fenêtre : RDV dont l'heure + 2h est entre -15min et +15min de maintenant
-  const windowStart = new Date(now.getTime() - 15 * 60 * 1000); // -15min
-  const windowEnd   = new Date(now.getTime() + 15 * 60 * 1000); // +15min
-
-  // Calculer la plage de dates/heures des RDV à notifier
-  // RDV heure cible = maintenant - 2h
-  const rdvTarget = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+  // Heure cible = maintenant - 2h (en heure Québec)
+  const rdvTarget     = new Date(now.getTime() - 2 * 60 * 60 * 1000);
   const rdvWindowStart = new Date(rdvTarget.getTime() - 15 * 60 * 1000);
   const rdvWindowEnd   = new Date(rdvTarget.getTime() + 15 * 60 * 1000);
 
-  // Formater pour Supabase
-  const today = rdvTarget.toISOString().split('T')[0];
-  const timeStart = rdvWindowStart.toTimeString().substring(0,5); // HH:MM
-  const timeEnd   = rdvWindowEnd.toTimeString().substring(0,5);
+  // Dates et heures EN HEURE QUÉBEC — c'est ainsi qu'elles sont stockées dans Supabase
+  const today     = toQuebecDate(rdvTarget);
+  const timeStart = toQuebecTime(rdvWindowStart); // HH:MM heure Québec
+  const timeEnd   = toQuebecTime(rdvWindowEnd);   // HH:MM heure Québec
 
+  console.log(`[send-review-sms] Maintenant (Québec): ${toQuebecTime(now)}`);
   console.log(`[send-review-sms] Cherche RDV du ${today} entre ${timeStart} et ${timeEnd}`);
 
-  // Chercher les réservations confirmées, sans avis envoyé, dans la fenêtre
   const resp = await fetch(
     `${SUPABASE_URL}/rest/v1/reservations?` +
     `statut=eq.confirmé&` +
@@ -57,9 +68,8 @@ exports.handler = async (event) => {
 
     if (!tel && !email) continue;
 
-    // Générer un token unique pour cet avis
     const reviewToken = Buffer.from(`review:${resa.id}:${Date.now()}`).toString('base64url');
-    const reviewUrl = `${SITE_URL}/review?token=${reviewToken}&id=${resa.id}`;
+    const reviewUrl   = `${SITE_URL}/review?token=${reviewToken}&id=${resa.id}`;
 
     // Sauvegarder le token
     await fetch(`${SUPABASE_URL}/rest/v1/reservations?id=eq.${resa.id}`, {
@@ -72,7 +82,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ avis_envoye: true, avis_token: reviewToken })
     });
 
-    // Envoyer SMS
+    // SMS
     if (tel && TWILIO_SID && TWILIO_TOKEN && TWILIO_PHONE) {
       const telClean = tel.replace(/\D/g, '').slice(-10);
       await fetch(
@@ -92,7 +102,7 @@ exports.handler = async (event) => {
       ).catch(e => console.error('SMS error:', e));
     }
 
-    // Envoyer email si pas de téléphone ou en complément
+    // Email
     if (email && RESEND_API_KEY) {
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -103,7 +113,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
           to: [email],
-          subject: '⭐ Comment s\'est passée votre visite ? | Barbe-À-Ras',
+          subject: "⭐ Comment s'est passée votre visite ? | Barbe-À-Ras",
           html: `
             <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;
               padding:30px;max-width:500px;margin:auto;border-top:4px solid #C9A84C">
@@ -116,8 +126,8 @@ exports.handler = async (event) => {
               </h2>
               <p style="margin-bottom:12px">Bonjour <strong>${prenom}</strong>,</p>
               <p style="color:rgba(245,240,232,0.7);line-height:1.7;margin-bottom:24px">
-                Merci d'avoir visité Barbe-À-Ras aujourd'hui. Votre satisfaction est notre priorité.
-                Prenez 30 secondes pour nous dire comment s'est passée votre visite — ça nous aide vraiment à nous améliorer.
+                Merci d'avoir visité Barbe-À-Ras aujourd'hui. Prenez 30 secondes pour nous dire
+                comment s'est passée votre visite — ça nous aide vraiment à nous améliorer.
               </p>
               <div style="text-align:center;margin:24px 0">
                 <a href="${reviewUrl}"
@@ -136,7 +146,7 @@ exports.handler = async (event) => {
     }
 
     sent++;
-    console.log(`[send-review-sms] SMS/email envoyé à ${prenom} pour RDV ${resa.id}`);
+    console.log(`[send-review-sms] Envoyé à ${prenom} pour RDV ${resa.id} (${resa.heure_rdv})`);
   }
 
   return { statusCode: 200, body: JSON.stringify({ sent }) };
