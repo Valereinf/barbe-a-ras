@@ -242,11 +242,14 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 /* SERVICES */
 .svc-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;
   gap:1rem;background:var(--charcoal);border:1px solid var(--gold4);padding:1rem 1.2rem;
-  margin-bottom:0.5rem;transition:border-color 0.2s}
+  margin-bottom:0.5rem;transition:border-color 0.2s;text-align:left}
 .svc-row:hover{border-color:var(--gold)}
 .svc-row.inactive{opacity:0.45}
-.svc-nom{font-weight:600;font-size:0.9rem;margin-bottom:0.2rem}
-.svc-meta{font-size:0.72rem;color:var(--dim2)}
+.svc-nom{font-weight:600;font-size:0.9rem;margin-bottom:0.2rem;text-align:left}
+.svc-meta{font-size:0.72rem;color:var(--dim2);text-align:left}
+.svc-prix{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);white-space:nowrap;text-align:right}
+.svc-duree{font-size:0.75rem;color:var(--dim2);text-align:right}
+.svc-actions{display:flex;gap:0.4rem;flex-shrink:0;justify-content:flex-end}
 .svc-prix{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);white-space:nowrap}
 .svc-duree{font-size:0.75rem;color:var(--dim2);text-align:right}
 .svc-actions{display:flex;gap:0.4rem;flex-shrink:0}
