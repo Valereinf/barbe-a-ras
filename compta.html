@@ -493,13 +493,25 @@ function showToast(msg, type='ok') {
 function doLogin() {
   const pwd = document.getElementById('login-pwd').value;
   if(pwd === ADMIN_PWD) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('main-screen').style.display = 'block';
-    init();
+    sessionStorage.setItem('compta_auth','1');
+    showMain();
   } else {
     document.getElementById('login-err').style.display = 'block';
   }
 }
+
+function showMain() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-screen').style.display = 'block';
+  init();
+}
+
+// Vérifier si déjà connecté au chargement
+(function checkAuth() {
+  if(sessionStorage.getItem('compta_auth') === '1') {
+    showMain();
+  }
+})();
 
 // ── TABS ──
 function switchTab(name) {
