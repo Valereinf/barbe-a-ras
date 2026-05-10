@@ -1324,7 +1324,7 @@ async function loadBookingServices() {
       return;
     }
 
-    services.forEach(s => { durationMap[s.nom] = s.duree; });
+    services.forEach(s => { SVC_DUR[s.nom] = s.duree; });
 
     const regular    = services.filter(s => !s.hors_heures);
     const horsHeures = services.filter(s =>  s.hors_heures);
