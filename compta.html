@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
+<title>Comptabilité — Barbe-À-Ras</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#C9A84C;--gold2:#E8C96B;--gold3:rgba(201,168,76,0.12);--gold4:rgba(201,168,76,0.35);
+  --black:#080808;--charcoal:#131313;--white:#F5F0E8;--dim:rgba(245,240,232,0.65);
+  --dim2:rgba(245,240,232,0.35);--red:#e74c3c;--green:#27ae60;--blue:#3498db;
+}
+body{font-family:'Barlow',sans-serif;background:var(--black);color:var(--white);min-height:100vh}
+
+/* NAV */
+nav{height:64px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 2rem;background:rgba(8,8,8,0.97);border-bottom:1px solid var(--gold4);
+  position:sticky;top:0;z-index:100}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px;
+  color:var(--gold);text-decoration:none;display:flex;align-items:center;gap:0.5rem}
+.nav-right{display:flex;align-items:center;gap:1rem}
+.nav-link{color:var(--dim2);font-size:0.75rem;letter-spacing:1px;text-decoration:none;
+  text-transform:uppercase;transition:color 0.2s}
+.nav-link:hover{color:var(--gold)}
+
+/* LOGIN */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 64px);padding:2rem}
+.login-card{background:var(--charcoal);border:1px solid var(--gold4);max-width:360px;width:100%;padding:2.5rem}
+.login-title{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:3px;color:var(--gold);margin-bottom:1.5rem;text-align:center}
+.field label{display:block;font-size:0.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);margin-bottom:0.4rem}
+.field input{width:100%;background:rgba(245,240,232,0.04);border:1px solid var(--gold4);
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:0.9rem;padding:0.75rem 1rem;outline:none}
+.field input:focus{border-color:var(--gold)}
+.field{margin-bottom:1rem}
+
+/* MAIN LAYOUT */
+.page{max-width:1200px;margin:0 auto;padding:1.5rem}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem}
+.page-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:3px}
+.page-title span{color:var(--gold)}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--gold4);margin-bottom:1.5rem;overflow-x:auto;gap:0}
+.tab-btn{padding:0.75rem 1.4rem;background:none;border:none;color:var(--dim2);
+  font-family:'Barlow',sans-serif;font-size:0.75rem;font-weight:600;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;
+  border-bottom:2px solid transparent;white-space:nowrap}
+.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* KPI CARDS */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+.kpi{background:var(--charcoal);border:1px solid var(--gold4);padding:1.2rem;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.green::before{background:var(--green)}
+.kpi.red::before{background:var(--red)}
+.kpi.gold::before{background:var(--gold)}
+.kpi.blue::before{background:var(--blue)}
+.kpi .val{font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1}
+.kpi.green .val{color:var(--green)}
+.kpi.red .val{color:var(--red)}
+.kpi.gold .val{color:var(--gold)}
+.kpi.blue .val{color:var(--blue)}
+.kpi .lbl{font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);margin-top:0.3rem}
+.kpi .sub{font-size:0.72rem;color:var(--dim2);margin-top:0.2rem}
+
+/* FORMULAIRES */
+.form-card{background:var(--charcoal);border:1px solid var(--gold4);padding:1.5rem;margin-bottom:1.5rem}
+.form-card h3{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;
+  color:var(--gold);margin-bottom:1.2rem;padding-bottom:0.6rem;border-bottom:1px solid var(--gold4)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1rem}
+.form-field label{display:block;font-size:0.65rem;letter-spacing:2px;text-transform:uppercase;
+  color:var(--dim2);margin-bottom:0.4rem}
+.form-field input,.form-field select,.form-field textarea{
+  width:100%;background:rgba(245,240,232,0.04);border:1px solid var(--gold4);
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:0.88rem;
+  padding:0.65rem 0.9rem;outline:none;transition:border-color 0.2s}
+.form-field input:focus,.form-field select:focus{border-color:var(--gold)}
+.form-field select option{background:var(--charcoal)}
+
+/* BOUTONS */
+.btn{padding:0.7rem 1.5rem;font-family:'Barlow',sans-serif;font-size:0.78rem;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;border:none;transition:all 0.2s}
+.btn-gold{background:var(--gold);color:var(--black)}
+.btn-gold:hover{background:var(--gold2)}
+.btn-green{background:var(--green);color:var(--white)}
+.btn-green:hover{background:#2ecc71}
+.btn-red{background:rgba(231,76,60,0.15);color:var(--red);border:1px solid var(--red)}
+.btn-outline{background:var(--gold3);color:var(--gold);border:1px solid var(--gold4)}
+.btn-sm-del{background:none;border:1px solid rgba(231,76,60,0.3);color:var(--red);
+  padding:0.25rem 0.6rem;font-size:0.68rem;cursor:pointer;letter-spacing:1px}
+.btn-sm-del:hover{background:rgba(231,76,60,0.1)}
+
+/* TABLES */
+.data-table{width:100%;border-collapse:collapse;font-size:0.83rem}
+.data-table th{font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;
+  color:var(--dim2);padding:0.6rem 0.8rem;border-bottom:1px solid var(--gold4);text-align:left}
+.data-table td{padding:0.6rem 0.8rem;border-bottom:1px solid rgba(201,168,76,0.07)}
+.data-table tr:hover td{background:rgba(201,168,76,0.03)}
+.data-table .montant{font-family:'Bebas Neue',sans-serif;font-size:1rem}
+.data-table .montant.green{color:var(--green)}
+.data-table .montant.red{color:var(--red)}
+.empty-table{text-align:center;padding:2rem;color:var(--dim2);font-size:0.85rem}
+
+/* FILTRES */
+.filters{display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;margin-bottom:1.2rem}
+.filters select,.filters input[type="date"]{
+  background:var(--charcoal);border:1px solid var(--gold4);color:var(--dim);
+  font-family:'Barlow',sans-serif;font-size:0.75rem;padding:0.4rem 0.8rem}
+
+/* SECTION TITRE */
+.section-label{font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);
+  margin-bottom:0.8rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gold4)}
+
+/* BÉNÉFICE */
+.benefice-box{background:var(--charcoal);border:2px solid var(--gold);padding:1.5rem;
+  text-align:center;margin-top:1rem}
+.benefice-box .b-val{font-family:'Bebas Neue',sans-serif;font-size:2.5rem;line-height:1}
+.benefice-box .b-lbl{font-size:0.65rem;letter-spacing:3px;text-transform:uppercase;
+  color:var(--dim2);margin-top:0.3rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--charcoal);
+  border-left:3px solid var(--green);border:1px solid var(--gold4);
+  padding:0.8rem 1.2rem;font-size:0.82rem;z-index:999;display:none}
+.toast.show{display:block}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .page{padding:1rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="admin.html" class="nav-logo">✂ Barbe-À-Ras <span style="font-size:0.7rem;color:var(--dim2);letter-spacing:1px">· COMPTA</span></a>
+  <div class="nav-right">
+    <a href="admin.html" class="nav-link">← Admin</a>
+    <span id="nav-date" style="font-size:0.75rem;color:var(--dim2)"></span>
+  </div>
+</nav>
+
+<!-- LOGIN -->
+<div id="login-screen" class="login-wrap">
+  <div class="login-card">
+    <div class="login-title">Accès Comptabilité</div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input type="password" id="login-pwd" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-top:0.5rem" onclick="doLogin()">Accéder</button>
+    <p id="login-err" style="color:var(--red);font-size:0.8rem;text-align:center;margin-top:0.8rem;display:none">Mot de passe incorrect</p>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main-screen" style="display:none">
+<div class="page">
+
+  <div class="page-header">
+    <h1 class="page-title">Gestion <span>Comptable</span></h1>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportCSV()">📥 Exporter CSV</button>
+      <button class="btn btn-gold" onclick="switchTab('encaissements')">+ Encaisser</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Tableau de bord</button>
+    <button class="tab-btn" onclick="switchTab('encaissements')">💰 Encaissements</button>
+    <button class="tab-btn" onclick="switchTab('depenses')">📋 Dépenses</button>
+    <button class="tab-btn" onclick="switchTab('rapports')">📈 Rapports</button>
+  </div>
+
+  <!-- ════ DASHBOARD ════ -->
+  <div class="tab-content active" id="tab-dashboard">
+    <div class="filters">
+      <select id="dash-periode" onchange="loadDashboard()">
+        <option value="today">Aujourd'hui</option>
+        <option value="week">Cette semaine</option>
+        <option value="month" selected>Ce mois</option>
+        <option value="year">Cette année</option>
+      </select>
+      <select id="dash-barbier" onchange="loadDashboard()">
+        <option value="">Tous les barbiers</option>
+      </select>
+    </div>
+    <div class="kpi-grid" id="dash-kpi"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+      <div class="form-card">
+        <h3>💰 Recettes par barbier</h3>
+        <div id="dash-barbier-chart"></div>
+      </div>
+      <div class="form-card">
+        <h3>💈 Recettes par service</h3>
+        <div id="dash-service-chart"></div>
+      </div>
+    </div>
+    <div class="form-card">
+      <h3>📅 Récapitulatif journalier</h3>
+      <div id="dash-daily-table"></div>
+    </div>
+  </div>
+
+  <!-- ════ ENCAISSEMENTS ════ -->
+  <div class="tab-content" id="tab-encaissements">
+    <div class="form-card">
+      <h3>💰 Nouvel encaissement</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Date *</label>
+          <input type="date" id="enc-date">
+        </div>
+        <div class="form-field">
+          <label>Barbier·ère *</label>
+          <select id="enc-barbier">
+            <option value="">Choisir...</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Service *</label>
+          <select id="enc-service">
+            <option value="">Choisir...</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Montant ($) *</label>
+          <input type="number" id="enc-montant" placeholder="29.50" step="0.50" min="0">
+        </div>
+      </div>
+      <div class="form-field" style="margin-bottom:1rem">
+        <label>Note (optionnel)</label>
+        <input type="text" id="enc-note" placeholder="Ex: Pourboire inclus, client régulier...">
+      </div>
+      <button class="btn btn-green" onclick="saveEncaissement()">✓ Encaisser</button>
+    </div>
+
+    <div class="form-card">
+      <h3>📋 Historique des encaissements</h3>
+      <div class="filters">
+        <input type="date" id="enc-filter-debut" onchange="loadEncaissements()">
+        <input type="date" id="enc-filter-fin" onchange="loadEncaissements()">
+        <select id="enc-filter-barbier" onchange="loadEncaissements()">
+          <option value="">Tous les barbiers</option>
+        </select>
+      </div>
+      <div id="enc-table"></div>
+      <div id="enc-total" style="text-align:right;font-family:'Bebas Neue',sans-serif;
+        font-size:1.3rem;color:var(--green);margin-top:0.8rem"></div>
+    </div>
+  </div>
+
+  <!-- ════ DÉPENSES ════ -->
+  <div class="tab-content" id="tab-depenses">
+    <div class="form-card">
+      <h3>📋 Nouvelle dépense</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Date *</label>
+          <input type="date" id="dep-date">
+        </div>
+        <div class="form-field">
+          <label>Catégorie *</label>
+          <select id="dep-categorie">
+            <option value="Loyer">Loyer / Charge locative</option>
+            <option value="Hydro">Hydro-Québec</option>
+            <option value="Salaires">Masse salariale</option>
+            <option value="Produits">Produits de salon</option>
+            <option value="Assurances">Assurances</option>
+            <option value="Internet">Internet / Téléphone</option>
+            <option value="Marketing">Marketing / Publicité</option>
+            <option value="Équipement">Équipement</option>
+            <option value="Divers">Dépenses diverses</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Type</label>
+          <select id="dep-type">
+            <option value="fixe">Charge fixe (mensuelle)</option>
+            <option value="variable" selected>Charge variable</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Montant ($) *</label>
+          <input type="number" id="dep-montant" placeholder="150.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="form-field" style="margin-bottom:1rem">
+        <label>Description *</label>
+        <input type="text" id="dep-description" placeholder="Ex: Loyer mai 2026, Produits L'Oréal...">
+      </div>
+      <button class="btn btn-gold" onclick="saveDepense()">+ Ajouter la dépense</button>
+    </div>
+
+    <div class="form-card">
+      <h3>📋 Historique des dépenses</h3>
+      <div class="filters">
+        <input type="date" id="dep-filter-debut" onchange="loadDepenses()">
+        <input type="date" id="dep-filter-fin" onchange="loadDepenses()">
+        <select id="dep-filter-cat" onchange="loadDepenses()">
+          <option value="">Toutes catégories</option>
+          <option value="Loyer">Loyer</option>
+          <option value="Hydro">Hydro</option>
+          <option value="Salaires">Salaires</option>
+          <option value="Produits">Produits</option>
+          <option value="Assurances">Assurances</option>
+          <option value="Internet">Internet</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Équipement">Équipement</option>
+          <option value="Divers">Divers</option>
+        </select>
+      </div>
+      <div id="dep-table"></div>
+      <div id="dep-total" style="text-align:right;font-family:'Bebas Neue',sans-serif;
+        font-size:1.3rem;color:var(--red);margin-top:0.8rem"></div>
+    </div>
+  </div>
+
+  <!-- ════ RAPPORTS ════ -->
+  <div class="tab-content" id="tab-rapports">
+    <div class="filters">
+      <select id="rpt-periode" onchange="loadRapports()">
+        <option value="week">Cette semaine</option>
+        <option value="month" selected>Ce mois</option>
+        <option value="3months">3 derniers mois</option>
+        <option value="year">Cette année</option>
+      </select>
+    </div>
+
+    <div class="kpi-grid" id="rpt-kpi"></div>
+
+    <div class="benefice-box" id="rpt-benefice">
+      <div class="b-val" id="rpt-benefice-val">—</div>
+      <div class="b-lbl">Bénéfice avant impôt</div>
+      <div style="font-size:0.72rem;color:var(--dim2);margin-top:0.5rem" id="rpt-benefice-sub"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem">
+      <div class="form-card">
+        <h3>💰 Recettes par barbier</h3>
+        <div id="rpt-barbier-chart"></div>
+      </div>
+      <div class="form-card">
+        <h3>📋 Dépenses par catégorie</h3>
+        <div id="rpt-dep-chart"></div>
+      </div>
+    </div>
+
+    <div class="form-card" style="margin-top:1.5rem">
+      <h3>📅 Évolution mensuelle</h3>
+      <div id="rpt-monthly-table"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
+const ADMIN_PWD = '040902Bs';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function localToday() {
+  return new Date().toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
+}
+function localMonth() {
+  return new Date().toLocaleDateString('en-CA',{timeZone:'America/Toronto'}).substring(0,7);
+}
+function fmt(n) { return parseFloat(n||0).toFixed(2); }
+function fmtMoney(n) { return parseFloat(n||0).toFixed(2) + ' $'; }
+
+function showToast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderLeftColor = type==='ok' ? 'var(--green)' : 'var(--red)';
+  t.className = 'toast show';
+  setTimeout(()=>t.className='toast', 3000);
+}
+
+// ── LOGIN ──
+function doLogin() {
+  const pwd = document.getElementById('login-pwd').value;
+  if(pwd === ADMIN_PWD) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-screen').style.display = 'block';
+    init();
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+  }
+}
+
+// ── TABS ──
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    const tabs = ['dashboard','encaissements','depenses','rapports'];
+    b.classList.toggle('active', tabs[i]===name);
+  });
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='dashboard')     loadDashboard();
+  if(name==='encaissements') loadEncaissements();
+  if(name==='depenses')      loadDepenses();
+  if(name==='rapports')      loadRapports();
+}
+
+// ── INIT ──
+async function init() {
+  const today = localToday();
+  document.getElementById('nav-date').textContent =
+    new Date().toLocaleDateString('fr-CA',{timeZone:'America/Toronto',weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Dates par défaut
+  document.getElementById('enc-date').value = today;
+  document.getElementById('dep-date').value = today;
+
+  // Filtres mois courant
+  const [y,m] = today.split('-');
+  const debut = `${y}-${m}-01`;
+  const fin = today;
+  ['enc-filter-debut','dep-filter-debut'].forEach(id=>document.getElementById(id).value=debut);
+  ['enc-filter-fin','dep-filter-fin'].forEach(id=>document.getElementById(id).value=fin);
+
+  // Charger les collaborateurs
+  const {data:collabs} = await sb.from('collaborateurs').select('nom').eq('actif',true).order('nom');
+  const collabsActifs = collabs||[];
+
+  ['enc-barbier','dash-barbier','enc-filter-barbier'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const val = sel.value;
+    const opts = sel.innerHTML.match(/<option value="">.*?<\/option>/)?.[0] || '';
+    sel.innerHTML = opts + collabsActifs.map(c=>`<option value="${c.nom}">${c.nom}</option>`).join('');
+    if(val) sel.value = val;
+  });
+
+  // Charger les services
+  const {data:services} = await sb.from('services').select('nom').eq('actif',true).order('ordre');
+  const sel = document.getElementById('enc-service');
+  if(sel && services) {
+    sel.innerHTML = '<option value="">Choisir...</option>' +
+      services.map(s=>`<option value="${s.nom}">${s.nom}</option>`).join('');
+  }
+
+  loadDashboard();
+}
+
+// ── GETDATE RANGE ──
+function getRange(periode) {
+  const today = localToday();
+  const now = new Date(today+'T12:00:00');
+  let debut, fin = today;
+  if(periode==='today') {
+    debut = today;
+  } else if(periode==='week') {
+    const d = new Date(now); d.setDate(d.getDate()-d.getDay()+1);
+    debut = d.toISOString().split('T')[0];
+  } else if(periode==='month') {
+    debut = today.substring(0,7)+'-01';
+  } else if(periode==='3months') {
+    const d = new Date(now); d.setMonth(d.getMonth()-3);
+    debut = d.toISOString().split('T')[0];
+  } else if(periode==='year') {
+    debut = today.substring(0,4)+'-01-01';
+  }
+  return {debut, fin};
+}
+
+// ── DASHBOARD ──
+async function loadDashboard() {
+  const periode  = document.getElementById('dash-periode').value;
+  const barbier  = document.getElementById('dash-barbier').value;
+  const {debut,fin} = getRange(periode);
+
+  let qEnc = sb.from('encaissements').select('*').gte('date',debut).lte('date',fin);
+  let qDep = sb.from('depenses').select('*').gte('date',debut).lte('date',fin);
+  if(barbier) qEnc = qEnc.eq('barbier', barbier);
+
+  const [{data:encs},{data:deps}] = await Promise.all([qEnc, qDep]);
+  const encList = encs||[], depList = deps||[];
+
+  const totalEnc = encList.reduce((s,e)=>s+parseFloat(e.montant),0);
+  const totalDep = depList.reduce((s,d)=>s+parseFloat(d.montant),0);
+  const benefice = totalEnc - totalDep;
+
+  document.getElementById('dash-kpi').innerHTML = `
+    <div class="kpi green">
+      <div class="val">${fmt(totalEnc)}$</div>
+      <div class="lbl">Recettes</div>
+      <div class="sub">${encList.length} encaissements</div>
+    </div>
+    <div class="kpi red">
+      <div class="val">${fmt(totalDep)}$</div>
+      <div class="lbl">Dépenses</div>
+      <div class="sub">${depList.length} dépenses</div>
+    </div>
+    <div class="kpi ${benefice>=0?'gold':'red'}">
+      <div class="val">${fmt(benefice)}$</div>
+      <div class="lbl">Bénéfice avant impôt</div>
+    </div>
+    <div class="kpi blue">
+      <div class="val">${encList.length}</div>
+      <div class="lbl">Encaissements</div>
+    </div>`;
+
+  // Par barbier
+  const parBarbier = {};
+  encList.forEach(e=>{ parBarbier[e.barbier] = (parBarbier[e.barbier]||0)+parseFloat(e.montant); });
+  const maxB = Math.max(...Object.values(parBarbier),1);
+  document.getElementById('dash-barbier-chart').innerHTML =
+    Object.entries(parBarbier).sort((a,b)=>b[1]-a[1]).map(([b,v])=>`
+      <div style="margin-bottom:0.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px">
+          <span>${b}</span><span style="color:var(--green)">${fmt(v)}$</span>
+        </div>
+        <div style="background:rgba(245,240,232,0.06);height:18px">
+          <div style="background:var(--green);height:100%;width:${Math.round(v/maxB*100)}%"></div>
+        </div>
+      </div>`).join('') || '<p style="color:var(--dim2);font-size:0.82rem">Aucune donnée</p>';
+
+  // Par service
+  const parService = {};
+  encList.forEach(e=>{ parService[e.service] = (parService[e.service]||0)+parseFloat(e.montant); });
+  const maxS = Math.max(...Object.values(parService),1);
+  document.getElementById('dash-service-chart').innerHTML =
+    Object.entries(parService).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([s,v])=>`
+      <div style="margin-bottom:0.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:3px">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${s}</span>
+          <span style="color:var(--gold)">${fmt(v)}$</span>
+        </div>
+        <div style="background:rgba(245,240,232,0.06);height:18px">
+          <div style="background:var(--gold);height:100%;width:${Math.round(v/maxS*100)}%"></div>
+        </div>
+      </div>`).join('') || '<p style="color:var(--dim2);font-size:0.82rem">Aucune donnée</p>';
+
+  // Tableau journalier
+  const parJour = {};
+  encList.forEach(e=>{ parJour[e.date] = (parJour[e.date]||0)+parseFloat(e.montant); });
+  const joursTriés = Object.keys(parJour).sort().reverse();
+  document.getElementById('dash-daily-table').innerHTML = joursTriés.length === 0
+    ? '<p class="empty-table">Aucune donnée pour cette période</p>'
+    : `<table class="data-table">
+        <thead><tr><th>Date</th><th>Nb encaissements</th><th>Total</th></tr></thead>
+        <tbody>${joursTriés.map(j=>`
+          <tr>
+            <td>${new Date(j+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'short',day:'numeric',month:'long'})}</td>
+            <td>${encList.filter(e=>e.date===j).length}</td>
+            <td class="montant green">${fmt(parJour[j])}$</td>
+          </tr>`).join('')}</tbody>
+       </table>`;
+}
+
+// ── ENCAISSEMENTS ──
+async function saveEncaissement() {
+  const date    = document.getElementById('enc-date').value;
+  const barbier = document.getElementById('enc-barbier').value;
+  const service = document.getElementById('enc-service').value;
+  const montant = parseFloat(document.getElementById('enc-montant').value);
+  const note    = document.getElementById('enc-note').value.trim()||null;
+
+  if(!date||!barbier||!service||isNaN(montant)||montant<=0) {
+    showToast('Remplissez tous les champs obligatoires', 'err'); return;
+  }
+
+  const {error} = await sb.from('encaissements').insert({date,barbier,service,montant,note});
+  if(error) { showToast('Erreur: '+error.message, 'err'); return; }
+
+  showToast('✅ Encaissement enregistré !');
+  document.getElementById('enc-montant').value = '';
+  document.getElementById('enc-note').value = '';
+  loadEncaissements();
+  loadDashboard();
+}
+
+async function loadEncaissements() {
+  const debut   = document.getElementById('enc-filter-debut').value;
+  const fin     = document.getElementById('enc-filter-fin').value;
+  const barbier = document.getElementById('enc-filter-barbier').value;
+
+  let q = sb.from('encaissements').select('*').order('date',{ascending:false}).order('created_at',{ascending:false});
+  if(debut) q = q.gte('date',debut);
+  if(fin)   q = q.lte('date',fin);
+  if(barbier) q = q.eq('barbier',barbier);
+
+  const {data:encs} = await q;
+  const list = encs||[];
+  const total = list.reduce((s,e)=>s+parseFloat(e.montant),0);
+
+  document.getElementById('enc-total').textContent = list.length > 0
+    ? `Total : ${fmt(total)} $` : '';
+
+  document.getElementById('enc-table').innerHTML = list.length === 0
+    ? '<p class="empty-table">Aucun encaissement pour cette période</p>'
+    : `<table class="data-table">
+        <thead><tr><th>Date</th><th>Barbier·ère</th><th>Service</th><th>Note</th><th>Montant</th><th></th></tr></thead>
+        <tbody>${list.map(e=>`
+          <tr>
+            <td>${new Date(e.date+'T12:00:00').toLocaleDateString('fr-CA',{day:'numeric',month:'short',year:'numeric'})}</td>
+            <td>${e.barbier}</td>
+            <td style="font-size:0.78rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.service}</td>
+            <td style="color:var(--dim2);font-size:0.75rem">${e.note||'—'}</td>
+            <td class="montant green">${fmt(e.montant)}$</td>
+            <td><button class="btn-sm-del" onclick="deleteEnc('${e.id}')">✕</button></td>
+          </tr>`).join('')}</tbody>
+       </table>`;
+}
+
+async function deleteEnc(id) {
+  if(!confirm('Supprimer cet encaissement ?')) return;
+  await sb.from('encaissements').delete().eq('id',id);
+  showToast('Supprimé');
+  loadEncaissements();
+  loadDashboard();
+}
+
+// ── DÉPENSES ──
+async function saveDepense() {
+  const date        = document.getElementById('dep-date').value;
+  const categorie   = document.getElementById('dep-categorie').value;
+  const type        = document.getElementById('dep-type').value;
+  const montant     = parseFloat(document.getElementById('dep-montant').value);
+  const description = document.getElementById('dep-description').value.trim();
+  const mois        = type==='fixe' ? date.substring(0,7) : null;
+
+  if(!date||!description||isNaN(montant)||montant<=0) {
+    showToast('Remplissez tous les champs obligatoires', 'err'); return;
+  }
+
+  const {error} = await sb.from('depenses').insert({date,categorie,type,montant,description,mois});
+  if(error) { showToast('Erreur: '+error.message, 'err'); return; }
+
+  showToast('✅ Dépense enregistrée !');
+  document.getElementById('dep-montant').value = '';
+  document.getElementById('dep-description').value = '';
+  loadDepenses();
+}
+
+async function loadDepenses() {
+  const debut = document.getElementById('dep-filter-debut').value;
+  const fin   = document.getElementById('dep-filter-fin').value;
+  const cat   = document.getElementById('dep-filter-cat').value;
+
+  let q = sb.from('depenses').select('*').order('date',{ascending:false}).order('created_at',{ascending:false});
+  if(debut) q = q.gte('date',debut);
+  if(fin)   q = q.lte('date',fin);
+  if(cat)   q = q.eq('categorie',cat);
+
+  const {data:deps} = await q;
+  const list = deps||[];
+  const total = list.reduce((s,d)=>s+parseFloat(d.montant),0);
+
+  document.getElementById('dep-total').textContent = list.length > 0
+    ? `Total : ${fmt(total)} $` : '';
+
+  const typeColors = {fixe:'var(--blue)',variable:'var(--gold)'};
+  document.getElementById('dep-table').innerHTML = list.length === 0
+    ? '<p class="empty-table">Aucune dépense pour cette période</p>'
+    : `<table class="data-table">
+        <thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Type</th><th>Montant</th><th></th></tr></thead>
+        <tbody>${list.map(d=>`
+          <tr>
+            <td>${new Date(d.date+'T12:00:00').toLocaleDateString('fr-CA',{day:'numeric',month:'short',year:'numeric'})}</td>
+            <td>${d.categorie}</td>
+            <td style="font-size:0.78rem">${d.description}</td>
+            <td><span style="font-size:0.65rem;padding:0.15rem 0.4rem;border:1px solid;
+              color:${typeColors[d.type]};border-color:${typeColors[d.type]}">${d.type}</span></td>
+            <td class="montant red">${fmt(d.montant)}$</td>
+            <td><button class="btn-sm-del" onclick="deleteDep('${d.id}')">✕</button></td>
+          </tr>`).join('')}</tbody>
+       </table>`;
+}
+
+async function deleteDep(id) {
+  if(!confirm('Supprimer cette dépense ?')) return;
+  await sb.from('depenses').delete().eq('id',id);
+  showToast('Supprimé');
+  loadDepenses();
+}
+
+// ── RAPPORTS ──
+async function loadRapports() {
+  const periode = document.getElementById('rpt-periode').value;
+  const {debut,fin} = getRange(periode);
+
+  const [{data:encs},{data:deps}] = await Promise.all([
+    sb.from('encaissements').select('*').gte('date',debut).lte('date',fin),
+    sb.from('depenses').select('*').gte('date',debut).lte('date',fin)
+  ]);
+  const encList = encs||[], depList = deps||[];
+
+  const totalEnc = encList.reduce((s,e)=>s+parseFloat(e.montant),0);
+  const totalDep = depList.reduce((s,d)=>s+parseFloat(d.montant),0);
+  const benefice = totalEnc - totalDep;
+  const totalFixe = depList.filter(d=>d.type==='fixe').reduce((s,d)=>s+parseFloat(d.montant),0);
+  const totalVar  = depList.filter(d=>d.type==='variable').reduce((s,d)=>s+parseFloat(d.montant),0);
+
+  document.getElementById('rpt-kpi').innerHTML = `
+    <div class="kpi green"><div class="val">${fmt(totalEnc)}$</div><div class="lbl">Recettes totales</div></div>
+    <div class="kpi red"><div class="val">${fmt(totalDep)}$</div><div class="lbl">Dépenses totales</div></div>
+    <div class="kpi blue"><div class="val">${fmt(totalFixe)}$</div><div class="lbl">Charges fixes</div></div>
+    <div class="kpi gold"><div class="val">${fmt(totalVar)}$</div><div class="lbl">Charges variables</div></div>`;
+
+  const bBox = document.getElementById('rpt-benefice');
+  const bVal = document.getElementById('rpt-benefice-val');
+  bVal.textContent = fmt(benefice) + ' $';
+  bVal.style.color = benefice >= 0 ? 'var(--green)' : 'var(--red)';
+  bBox.style.borderColor = benefice >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('rpt-benefice-sub').textContent =
+    `Recettes ${fmt(totalEnc)}$ − Dépenses ${fmt(totalDep)}$`;
+
+  // Par barbier
+  const parBarbier = {};
+  encList.forEach(e=>{ parBarbier[e.barbier] = (parBarbier[e.barbier]||0)+parseFloat(e.montant); });
+  const maxB = Math.max(...Object.values(parBarbier),1);
+  document.getElementById('rpt-barbier-chart').innerHTML =
+    Object.entries(parBarbier).sort((a,b)=>b[1]-a[1]).map(([b,v])=>`
+      <div style="margin-bottom:0.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px">
+          <span>${b}</span><span style="color:var(--green)">${fmt(v)}$</span>
+        </div>
+        <div style="background:rgba(245,240,232,0.06);height:18px">
+          <div style="background:var(--green);height:100%;width:${Math.round(v/maxB*100)}%"></div>
+        </div>
+      </div>`).join('') || '<p style="color:var(--dim2);font-size:0.82rem">Aucune donnée</p>';
+
+  // Dépenses par catégorie
+  const parCat = {};
+  depList.forEach(d=>{ parCat[d.categorie] = (parCat[d.categorie]||0)+parseFloat(d.montant); });
+  const maxC = Math.max(...Object.values(parCat),1);
+  document.getElementById('rpt-dep-chart').innerHTML =
+    Object.entries(parCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`
+      <div style="margin-bottom:0.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px">
+          <span>${c}</span><span style="color:var(--red)">${fmt(v)}$</span>
+        </div>
+        <div style="background:rgba(245,240,232,0.06);height:18px">
+          <div style="background:var(--red);height:100%;width:${Math.round(v/maxC*100)}%"></div>
+        </div>
+      </div>`).join('') || '<p style="color:var(--dim2);font-size:0.82rem">Aucune dépense</p>';
+
+  // Évolution mensuelle (12 derniers mois)
+  const mois = [];
+  for(let i=11;i>=0;i--){
+    const d=new Date(); d.setMonth(d.getMonth()-i);
+    mois.push(d.toISOString().substring(0,7));
+  }
+  document.getElementById('rpt-monthly-table').innerHTML =
+    `<table class="data-table">
+      <thead><tr><th>Mois</th><th>Recettes</th><th>Dépenses</th><th>Bénéfice</th></tr></thead>
+      <tbody>${mois.map(m=>{
+        const r = encList.filter(e=>e.date.startsWith(m)).reduce((s,e)=>s+parseFloat(e.montant),0);
+        const d = depList.filter(e=>e.date.startsWith(m)).reduce((s,e)=>s+parseFloat(e.montant),0);
+        const b = r-d;
+        return `<tr>
+          <td>${m}</td>
+          <td class="montant green">${fmt(r)}$</td>
+          <td class="montant red">${fmt(d)}$</td>
+          <td class="montant ${b>=0?'green':'red'}">${fmt(b)}$</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+// ── EXPORT CSV ──
+function exportCSV() {
+  // Exporter les encaissements
+  const today = localToday();
+  sb.from('encaissements').select('*').order('date',{ascending:false}).then(({data})=>{
+    if(!data||!data.length){ showToast('Aucune donnée à exporter','err'); return; }
+    const rows = [['Date','Barbier','Service','Montant','Note']].concat(
+      data.map(e=>[e.date,e.barbier,`"${e.service}"`,e.montant,e.note||'']));
+    const csv = rows.map(r=>r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    a.download = `encaissements_${today}.csv`;
+    a.click();
+    showToast('✅ Export CSV téléchargé');
+  });
+}
+</script>
+</body>
+</html>
