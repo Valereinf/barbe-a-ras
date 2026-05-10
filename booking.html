@@ -223,59 +223,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
         <span style="font-size:0.65rem;color:var(--dim2);letter-spacing:1px">Sélection multiple possible</span>
       </div>
       <div class="panel-body" style="padding:0">
-        <div class="svc-list">
-          <div class="svc-cat">★ Services populaires</div>
-          <div class="svc-item" data-name="Coupe de cheveux adulte" data-price="29.50" data-dur="30" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe de cheveux adulte</h4><p>Dégradé, fondu ou ciseaux. Finition rasoir incluse.</p></div>
-            <div class="svc-meta"><div class="svc-price">29.50$</div><div class="svc-dur">+ taxes · 30 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Coupe enfant (0-15 ans)" data-price="27.00" data-dur="30" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe enfant (0-15 ans)</h4><p>Approche douce et patiente.</p></div>
-            <div class="svc-meta"><div class="svc-price">27.00$</div><div class="svc-dur">+ taxes · 30 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Cheveux + barbe à la lame serviette chaude" data-price="56.00" data-dur="60" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Cheveux + barbe à la lame, serviette chaude</h4><p>Le combo premium — rasage traditionnel inclus.</p></div>
-            <div class="svc-meta"><div class="svc-price">56.00$</div><div class="svc-dur">+ taxes · 1h</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-cat">Autres services</div>
-          <div class="svc-item" data-name="Coupe de cheveux long à court" data-price="47.00" data-dur="45" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe de cheveux long à court</h4><p>Transformation complète vers une coupe courte.</p></div>
-            <div class="svc-meta"><div class="svc-price">47.00$</div><div class="svc-dur">+ taxes · 45 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Coupe + barbe au clipper" data-price="47.00" data-dur="45" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe + barbe au clipper</h4><p>Contour net, look impeccable.</p></div>
-            <div class="svc-meta"><div class="svc-price">47.00$</div><div class="svc-dur">+ taxes · 45 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Coupe + shampoing" data-price="31.50" data-dur="30" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe + shampoing</h4><p>Lavage professionnel + coupe personnalisée.</p></div>
-            <div class="svc-meta"><div class="svc-price">31.50$</div><div class="svc-dur">+ taxes · 30 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Barbe à la lame + serviettes chaudes" data-price="29.50" data-dur="30" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Barbe à la lame + serviettes chaudes</h4><p>Rasage traditionnel pur.</p></div>
-            <div class="svc-meta"><div class="svc-price">29.50$</div><div class="svc-dur">+ taxes · 30 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Cheveux + barbe lame + shampoing" data-price="59.00" data-dur="60" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Cheveux + barbe lame + shampoing</h4><p>Tout inclus — le soin complet ultime.</p></div>
-            <div class="svc-meta"><div class="svc-price">59.00$</div><div class="svc-dur">+ taxes · 1h</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-cat">⏰ Hors heures ouvrables <span style="font-size:0.55rem;opacity:0.6">(appeler)</span></div>
-          <div class="svc-item" data-name="Coupe adulte hors heures" data-price="55.00" data-dur="30" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe adulte — hors heures</h4><div class="svc-badge">📞 Appeler au salon</div></div>
-            <div class="svc-meta"><div class="svc-price">55.00$</div><div class="svc-dur">+ taxes · 30 min</div></div>
-            <div class="svc-check">✓</div>
-          </div>
-          <div class="svc-item" data-name="Coupe + barbe lame hors heures" data-price="105.00" data-dur="60" onclick="toggleSvc(this)">
-            <div class="svc-info"><h4>Coupe + barbe lame — hors heures</h4><div class="svc-badge">📞 Appeler au salon</div></div>
-            <div class="svc-meta"><div class="svc-price">105.00$</div><div class="svc-dur">+ taxes · 1h</div></div>
-            <div class="svc-check">✓</div>
+        <div class="svc-list" id="svc-list-dynamic">
+          <div style="padding:2rem;text-align:center;color:rgba(245,240,232,0.3);font-size:0.85rem">
+            Chargement des services...
           </div>
         </div>
         <div class="cart-summary" id="cart-summary" style="display:none">
@@ -1363,8 +1313,62 @@ function addAnotherService(){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+// Charger les services depuis Supabase
+async function loadBookingServices() {
+  const {data:services, error} = await sb.from('services')
+    .select('*').eq('actif', true).order('ordre').order('nom');
+  if(error || !services || !services.length) return;
+
+  // Mettre à jour le durationMap dynamiquement
+  services.forEach(s => { durationMap[s.nom] = s.duree; });
+
+  const regular = services.filter(s=>!s.hors_heures);
+  const horsHeures = services.filter(s=>s.hors_heures);
+
+  const renderSvc = (s) => {
+    const dureeLabel = s.duree >= 60
+      ? (s.duree % 60 === 0 ? `${s.duree/60}h` : `${Math.floor(s.duree/60)}h${s.duree%60}`)
+      : `${s.duree} min`;
+    return `<div class="svc-item" data-name="${s.nom.replace(/"/g,'&quot;')}"
+      data-price="${parseFloat(s.prix).toFixed(2)}" data-dur="${s.duree}"
+      onclick="toggleSvc(this)">
+      <div class="svc-info">
+        <h4>${s.nom}</h4>
+        ${s.hors_heures
+          ? '<div class="svc-badge">📞 Appeler au salon</div>'
+          : `<p>${s.description||''}</p>`}
+      </div>
+      <div class="svc-meta">
+        <div class="svc-price">${parseFloat(s.prix).toFixed(2)}$</div>
+        <div class="svc-dur">+ taxes · ${dureeLabel}</div>
+      </div>
+      <div class="svc-check">✓</div>
+    </div>`;
+  };
+
+  let html = '';
+  if(regular.length) {
+    html += '<div class="svc-cat">★ Services</div>';
+    html += regular.map(renderSvc).join('');
+  }
+  if(horsHeures.length) {
+    html += '<div class="svc-cat">⏰ Hors heures ouvrables <span style="font-size:0.55rem;opacity:0.6">(appeler)</span></div>';
+    html += horsHeures.map(renderSvc).join('');
+  }
+
+  const container = document.getElementById('svc-list-dynamic');
+  if(container) container.innerHTML = html;
+
+  // Realtime — recharger si services changent
+  sb.channel('booking-services')
+    .on('postgres_changes',{event:'*',schema:'public',table:'services'},()=>{
+      loadBookingServices();
+    }).subscribe();
+}
+
 // Charger les collaborateurs au démarrage
 loadBookingCollabs();
+loadBookingServices();
 
 // Charger les mini avis
 (async function() {
