@@ -781,72 +781,7 @@ async function selDay(d,dt,el){
     return;
   }
 
-  const collabs = await // ── SERVICES DYNAMIQUES ──
-async function loadBookingServices() {
-  try {
-    const {data:services, error} = await sb.from('services')
-      .select('*').eq('actif', true).order('ordre').order('nom');
-
-    const container = document.getElementById('svc-list-dynamic');
-    if(!container) return;
-
-    if(error) {
-      console.error('[Services]', error.message);
-      container.innerHTML = '<div style="padding:1rem;color:rgba(245,240,232,0.4);font-size:0.85rem">Erreur chargement. Actualisez la page.</div>';
-      return;
-    }
-    if(!services || !services.length) {
-      container.innerHTML = '<div style="padding:1rem;color:rgba(245,240,232,0.4);font-size:0.85rem">Aucun service disponible.</div>';
-      return;
-    }
-
-    // Mettre à jour le durationMap
-    services.forEach(s => { durationMap[s.nom] = s.duree; });
-
-    const regular   = services.filter(s => !s.hors_heures);
-    const horsHeures = services.filter(s =>  s.hors_heures);
-
-    const renderSvc = s => {
-      const d = s.duree;
-      const dureeLabel = d >= 60
-        ? (d % 60 === 0 ? d/60+'h' : Math.floor(d/60)+'h'+String(d%60).padStart(2,'0'))
-        : d+' min';
-      const nom = s.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-      return `<div class="svc-item" data-name="${nom}"
-        data-price="${parseFloat(s.prix).toFixed(2)}" data-dur="${s.duree}"
-        onclick="toggleSvc(this)">
-        <div class="svc-info">
-          <h4>${s.nom}</h4>
-          ${s.hors_heures
-            ? '<div class="svc-badge">📞 Appeler au salon</div>'
-            : `<p>${s.description||''}</p>`}
-        </div>
-        <div class="svc-meta">
-          <div class="svc-price">${parseFloat(s.prix).toFixed(2)}$</div>
-          <div class="svc-dur">+ taxes · ${dureeLabel}</div>
-        </div>
-        <div class="svc-check">✓</div>
-      </div>`;
-    };
-
-    let html = '';
-    if(regular.length)    html += '<div class="svc-cat">★ Services</div>' + regular.map(renderSvc).join('');
-    if(horsHeures.length) html += '<div class="svc-cat">⏰ Hors heures <span style="font-size:0.55rem;opacity:0.6">(appeler)</span></div>' + horsHeures.map(renderSvc).join('');
-    container.innerHTML = html;
-
-    // Realtime — mise à jour auto si Barbara modifie les services
-    sb.channel('booking-services')
-      .on('postgres_changes',{event:'*',schema:'public',table:'services'},()=>{
-        loadBookingServices();
-      }).subscribe();
-
-  } catch(e) {
-    console.error('[Services] Exception:', e);
-  }
-}
-
-loadBookingCollabs();
-loadBookingServices();
+  const collabs = await loadBookingCollabs();
   const collabNames = collabs.map(c=>c.nom);
 
   const [indiResp, ...resaResps] = await Promise.all([
@@ -1366,6 +1301,69 @@ function addAnotherService(){
 
 // Charger les collaborateurs au démarrage
 loadBookingCollabs();
+
+// ── SERVICES DYNAMIQUES ──
+async function loadBookingServices() {
+  try {
+    const {data:services, error} = await sb.from('services')
+      .select('*').eq('actif', true).order('ordre').order('nom');
+
+    console.log('[Services] data:', services);
+    console.log('[Services] error:', error);
+
+    const container = document.getElementById('svc-list-dynamic');
+    if(!container) return;
+
+    if(error) {
+      console.error('[Services]', error.message);
+      container.innerHTML = '<div style="padding:1rem;color:rgba(245,240,232,0.4);font-size:0.85rem">Erreur chargement. Actualisez la page.</div>';
+      return;
+    }
+    if(!services || !services.length) {
+      container.innerHTML = '<div style="padding:1rem;color:rgba(245,240,232,0.4);font-size:0.85rem">Aucun service disponible.</div>';
+      return;
+    }
+
+    services.forEach(s => { durationMap[s.nom] = s.duree; });
+
+    const regular    = services.filter(s => !s.hors_heures);
+    const horsHeures = services.filter(s =>  s.hors_heures);
+
+    const renderSvc = s => {
+      const d = s.duree;
+      const dureeLabel = d >= 60
+        ? (d%60===0 ? d/60+'h' : Math.floor(d/60)+'h'+String(d%60).padStart(2,'0'))
+        : d+' min';
+      const nomSafe = s.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      return `<div class="svc-item" data-name="${nomSafe}"
+        data-price="${parseFloat(s.prix).toFixed(2)}" data-dur="${s.duree}"
+        onclick="toggleSvc(this)">
+        <div class="svc-info">
+          <h4>${s.nom}</h4>
+          ${s.hors_heures ? '<div class="svc-badge">📞 Appeler au salon</div>' : `<p>${s.description||''}</p>`}
+        </div>
+        <div class="svc-meta">
+          <div class="svc-price">${parseFloat(s.prix).toFixed(2)}$</div>
+          <div class="svc-dur">+ taxes · ${dureeLabel}</div>
+        </div>
+        <div class="svc-check">✓</div>
+      </div>`;
+    };
+
+    let html = '';
+    if(regular.length)    html += '<div class="svc-cat">★ Services</div>' + regular.map(renderSvc).join('');
+    if(horsHeures.length) html += '<div class="svc-cat">⏰ Hors heures <span style="font-size:0.55rem;opacity:0.6">(appeler)</span></div>' + horsHeures.map(renderSvc).join('');
+    container.innerHTML = html;
+
+    sb.channel('booking-services')
+      .on('postgres_changes',{event:'*',schema:'public',table:'services'},()=>loadBookingServices())
+      .subscribe();
+
+  } catch(e) {
+    console.error('[Services] Exception:', e);
+  }
+}
+loadBookingServices();
 
 // Charger les mini avis
 (async function() {
