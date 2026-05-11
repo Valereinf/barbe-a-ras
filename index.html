@@ -347,35 +347,8 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
     <span class="s-eye">Ce qu'on fait</span>
     <h2 class="s-h">Nos <span class="g">services</span></h2>
     <div class="s-bar"></div>
-    <div class="svc-grid">
-      <div class="svc">
-        <div class="svc-num">01</div>
-        <h3>Coupe de cheveux</h3>
-        <p>Dégradé, fondu, ciseaux — chaque coupe est adaptée à ta morphologie et ton style de vie. Finition rasoir incluse.</p>
-        <div class="svc-price"><span class="p">29.50$</span><span class="d">adulte · 30 min</span></div>
-        <a href="booking.html" class="svc-cta">Réserver →</a>
-      </div>
-      <div class="svc">
-        <div class="svc-num">02</div>
-        <h3>Taille de barbe</h3>
-        <p>Rasage traditionnel à la lame droite avec serviettes chaudes. Contour précis, dégradé parfait.</p>
-        <div class="svc-price"><span class="p">29.50$</span><span class="d">+ taxes · 30 min</span></div>
-        <a href="booking.html" class="svc-cta">Réserver →</a>
-      </div>
-      <div class="svc">
-        <div class="svc-num">03</div>
-        <h3>Combo cheveux + barbe</h3>
-        <p>La totale premium. Coupe complète + rasage à la lame avec serviette chaude. L'expérience ultime.</p>
-        <div class="svc-price"><span class="p">56.00$</span><span class="d">+ taxes · 1h</span></div>
-        <a href="booking.html" class="svc-cta">Réserver →</a>
-      </div>
-      <div class="svc">
-        <div class="svc-num">04</div>
-        <h3>Coupe enfant</h3>
-        <p>Approche douce et patiente pour les 0-15 ans. Résultat propre, sourire garanti.</p>
-        <div class="svc-price"><span class="p">27.00$</span><span class="d">+ taxes · 30 min</span></div>
-        <a href="booking.html" class="svc-cta">Réserver →</a>
-      </div>
+    <div class="svc-grid" id="svc-grid-dynamic">
+      <!-- Chargement dynamique depuis Supabase -->
     </div>
   </div>
 </section>
@@ -392,55 +365,8 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
       <thead>
         <tr><th>Service</th><th>Durée</th><th>Prix</th></tr>
       </thead>
-      <tbody>
-        <tr><td colspan="3" style="padding:0"><span class="tarif-cat">★ Services populaires</span></td></tr>
-        <tr>
-          <td>Coupe de cheveux adulte</td>
-          <td><span>30 min</span></td>
-          <td>29.50$ <span>+ taxes</span></td>
-        </tr>
-        <tr>
-          <td>Coupe de cheveux enfant (0-15 ans)</td>
-          <td><span>30 min</span></td>
-          <td>27.00$ <span>+ taxes</span></td>
-        </tr>
-        <tr>
-          <td>Cheveux + barbe à la lame, serviette chaude</td>
-          <td><span>1h</span></td>
-          <td>56.00$ <span>+ taxes</span></td>
-        </tr>
-        <tr><td colspan="3" style="padding:0"><span class="tarif-cat">Autres services</span></td></tr>
-        <tr>
-          <td>Coupe de cheveux + barbe au clipper</td>
-          <td><span>45 min</span></td>
-          <td>47.00$ <span>+ taxes</span></td>
-        </tr>
-        <tr>
-          <td>Coupe de cheveux + shampoing</td>
-          <td><span>30 min</span></td>
-          <td>31.50$ <span>+ taxes</span></td>
-        </tr>
-        <tr>
-          <td>Barbe à la lame + serviettes chaudes</td>
-          <td><span>30 min</span></td>
-          <td>29.50$ <span>+ taxes</span></td>
-        </tr>
-        <tr>
-          <td>Cheveux + barbe à la lame + shampoing</td>
-          <td><span>1h</span></td>
-          <td>59.00$ <span>+ taxes</span></td>
-        </tr>
-        <tr><td colspan="3" style="padding:0"><span class="tarif-cat">⏰ Services après les heures ouvrables <span style="font-size:0.58rem;opacity:0.6">(appeler pour réserver)</span></span></td></tr>
-        <tr>
-          <td>Coupe de cheveux adulte <span class="tarif-badge">hors heures</span></td>
-          <td><span>30 min</span></td>
-          <td>55.00$ <span>+ taxes</span></td>
-        </tr>
-        <tr>
-          <td>Coupe adulte + barbe à la lame <span class="tarif-badge">hors heures</span></td>
-          <td><span>1h</span></td>
-          <td>105.00$ <span>+ taxes</span></td>
-        </tr>
+      <tbody id="tarif-tbody-dynamic">
+        <!-- Chargement dynamique depuis Supabase -->
       </tbody>
     </table>
     <div class="tarif-note">
@@ -664,6 +590,88 @@ footer{background:var(--black);border-top:1px solid var(--gold4);padding:3.5rem 
   const SUPABASE_URL = 'https://uqohxkpxcamrqlmuxaae.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxb2h4a3B4Y2FtcnFsbXV4YWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODcwMTgsImV4cCI6MjA5Mjk2MzAxOH0.AtV-__Hz6bCqeizWIpEVHR2OomIfbJANyJWJej7BopQ';
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // ── SERVICES & TARIFS DYNAMIQUES ──
+  const {data: services} = await sb.from('services')
+    .select('*')
+    .eq('actif', true)
+    .order('ordre')
+    .order('nom');
+
+  if (services && services.length > 0) {
+    const regular    = services.filter(s => !s.hors_heures);
+    const horsHeures = services.filter(s =>  s.hors_heures);
+
+    // --- Section "Nos services" (4 cartes) ---
+    const svcGrid = document.getElementById('svc-grid-dynamic');
+    if (svcGrid) {
+      const top4 = regular.slice(0, 4);
+      svcGrid.innerHTML = top4.map((s, i) => {
+        const d = s.duree;
+        const dureeLabel = d >= 60
+          ? (d % 60 === 0 ? d/60 + 'h' : Math.floor(d/60) + 'h' + String(d%60).padStart(2,'0'))
+          : d + ' min';
+        return `
+          <div class="svc">
+            <div class="svc-num">0${i+1}</div>
+            <h3>${s.nom}</h3>
+            <p>${s.description || ''}</p>
+            <div class="svc-price">
+              <span class="p">${parseFloat(s.prix).toFixed(2)}$</span>
+              <span class="d">+ taxes · ${dureeLabel}</span>
+            </div>
+            <a href="booking.html" class="svc-cta">Réserver →</a>
+          </div>`;
+      }).join('');
+    }
+
+    // --- Section "Tous nos tarifs" (tableau complet) ---
+    const tarifBody = document.getElementById('tarif-tbody-dynamic');
+    if (tarifBody) {
+      let html = '';
+
+      if (regular.length > 0) {
+        html += `<tr><td colspan="3" style="padding:0"><span class="tarif-cat">★ Services</span></td></tr>`;
+        html += regular.map(s => {
+          const d = s.duree;
+          const dureeLabel = d >= 60
+            ? (d % 60 === 0 ? d/60 + 'h' : Math.floor(d/60) + 'h' + String(d%60).padStart(2,'0'))
+            : d + ' min';
+          return `
+            <tr>
+              <td>${s.nom}</td>
+              <td><span>${dureeLabel}</span></td>
+              <td>${parseFloat(s.prix).toFixed(2)}$ <span>+ taxes</span></td>
+            </tr>`;
+        }).join('');
+      }
+
+      if (horsHeures.length > 0) {
+        html += `<tr><td colspan="3" style="padding:0"><span class="tarif-cat">⏰ Services après les heures ouvrables <span style="font-size:0.58rem;opacity:0.6">(appeler pour réserver)</span></span></td></tr>`;
+        html += horsHeures.map(s => {
+          const d = s.duree;
+          const dureeLabel = d >= 60
+            ? (d % 60 === 0 ? d/60 + 'h' : Math.floor(d/60) + 'h' + String(d%60).padStart(2,'0'))
+            : d + ' min';
+          return `
+            <tr>
+              <td>${s.nom} <span class="tarif-badge">hors heures</span></td>
+              <td><span>${dureeLabel}</span></td>
+              <td>${parseFloat(s.prix).toFixed(2)}$ <span>+ taxes</span></td>
+            </tr>`;
+        }).join('');
+      }
+
+      tarifBody.innerHTML = html;
+    }
+  }
+
+  // Realtime — mettre à jour si Barbara modifie un service
+  sb.channel('index-services')
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'services'}, () => {
+      location.reload();
+    })
+    .subscribe();
 
   // Charger les 3 meilleurs avis pour la section "Réserve ta place"
   const {data:topAvis} = await sb.from('avis')
