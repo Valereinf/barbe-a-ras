@@ -163,6 +163,10 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;
   align-items:center;justify-content:center;padding:1.5rem}
 .modal-bg.open{display:flex}
+.modal-input{width:100%;background:rgba(245,240,232,0.04);border:1px solid var(--gold4);
+  color:var(--white);font-family:'Barlow',sans-serif;font-size:0.88rem;padding:0.65rem 0.9rem;
+  outline:none;transition:border-color 0.2s}
+.modal-input:focus{border-color:var(--gold)}
 .modal{background:var(--charcoal);border:1px solid var(--gold4);max-width:540px;width:100%;
   max-height:85vh;overflow-y:auto}
 .modal-head{padding:1.2rem 1.5rem;border-bottom:1px solid var(--gold4);
@@ -372,6 +376,9 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div class="nav-item" onclick="showTab('stats')" id="nav-stats">
         <span class="ico">📈</span>Statistiques
       </div>
+      <div class="nav-item" onclick="showTab('services')" id="nav-services">
+        <span class="ico">💈</span>Services
+      </div>
       <div class="nav-item" onclick="showTab('avis')" id="nav-avis">
         <span class="ico">⭐</span>Avis clients
       </div>
@@ -577,6 +584,19 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
     </div>
 
       <!-- TAB: AVIS CLIENTS -->
+      <div class="tab" id="tab-services">
+        <div class="sec-head">
+          <h2>💈 <span>Services</span></h2>
+          <button class="btn-sm btn-gold-sm" onclick="openServiceModal()">+ Ajouter</button>
+        </div>
+        <table class="data-table" id="services-table">
+          <thead><tr>
+            <th>Nom</th><th>Description</th><th>Prix</th><th>Durée</th><th>Statut</th><th>Hors heures</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="services-tbody"><tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+
       <div class="tab" id="tab-avis">
         <div class="sec-head">
           <h2>Avis <span>clients</span></h2>
@@ -628,6 +648,53 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <button onclick="document.getElementById('modal-absent').style.display='none'" style="background:transparent;border:1px solid var(--gold4);color:var(--dim2);padding:0.9rem 1.2rem;font-size:0.85rem;cursor:pointer">
         Annuler
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SERVICE -->
+<div id="modal-service" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--charcoal);border:1px solid var(--gold4);max-width:480px;width:90%;padding:2rem;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+      <h3 id="modal-service-title" style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;color:var(--gold)">💈 NOUVEAU SERVICE</h3>
+      <button onclick="closeServiceModal()" style="background:none;border:none;color:var(--dim2);font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <input type="hidden" id="svc-id">
+    <div style="margin-bottom:1rem">
+      <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Nom du service *</label>
+      <input type="text" id="svc-nom" placeholder="Ex: Coupe de cheveux adulte" class="modal-input">
+    </div>
+    <div style="margin-bottom:1rem">
+      <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Description</label>
+      <input type="text" id="svc-description" placeholder="Description optionnelle" class="modal-input">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div>
+        <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Prix ($) *</label>
+        <input type="number" id="svc-prix" placeholder="29.50" step="0.01" min="0" class="modal-input">
+      </div>
+      <div>
+        <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Durée (min) *</label>
+        <input type="number" id="svc-duree" placeholder="30" step="15" min="15" class="modal-input">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div>
+        <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);display:block;margin-bottom:0.4rem">Ordre d'affichage</label>
+        <input type="number" id="svc-ordre" placeholder="0" min="0" class="modal-input">
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end;gap:0.6rem;padding-bottom:0.1rem">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.82rem">
+          <input type="checkbox" id="svc-actif" checked style="accent-color:var(--gold)"> Actif
+        </label>
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.82rem">
+          <input type="checkbox" id="svc-hors-heures" style="accent-color:var(--gold)"> Hors heures
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.8rem;margin-top:1.5rem">
+      <button onclick="saveService()" style="flex:1;background:var(--gold);color:var(--black);border:none;padding:0.8rem;font-family:'Barlow',sans-serif;font-size:0.85rem;font-weight:700;letter-spacing:2px;cursor:pointer">SAUVEGARDER</button>
+      <button onclick="closeServiceModal()" style="background:none;border:1px solid var(--gold4);color:var(--dim2);padding:0.8rem 1.2rem;font-family:'Barlow',sans-serif;font-size:0.82rem;cursor:pointer">Annuler</button>
     </div>
   </div>
 </div>
@@ -1315,9 +1382,9 @@ async function loadWaitlist() {
 // STATS & TODAY
 // ═══════════════════════════════════════════
 function updateStats() {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localToday();
   const weekStart = new Date(); weekStart.setDate(weekStart.getDate()-weekStart.getDay());
-  const weekStr = weekStart.toISOString().split('T')[0];
+  const weekStr = weekStart.toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
 
   const todayResa = allResa.filter(r=>r.date_rdv===todayStr&&r.statut==='confirmé');
   const weekResa = allResa.filter(r=>r.date_rdv>=weekStr&&r.statut==='confirmé');
@@ -1326,7 +1393,7 @@ function updateStats() {
 }
 
 function loadTodayList() {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localToday();
   const todayResa = allResa
     .filter(r=>r.date_rdv===todayStr&&r.statut==='confirmé')
     .sort((a,b)=>a.heure_rdv.localeCompare(b.heure_rdv));
@@ -1531,7 +1598,7 @@ async function _execMarquerAbsent(resaId) {
       const nbAbs = (cl?.nb_absences||0) + 1;
       await sb.from('clients').update({
         nb_absences: nbAbs,
-        derniere_absence: new Date().toISOString().split('T')[0]
+        derniere_absence: localToday()
       }).eq('id', clientId);
 
       // 4. Envoyer notification email/SMS
@@ -1942,6 +2009,7 @@ function showTab(name) {
   if(name==='collaborateurs') loadCollabsTab();
   if(name==='calendrier') { loadCalendrier(); return; }
   if(name==='stats') { loadStats(); return; }
+  if(name==='services') { loadServices(); return; }
   if(name==='avis') { loadAvis(); return; }
   document.getElementById('nav-'+name).classList.add('active');
   if(name==='calendrier') loadCalendrier();
@@ -1962,15 +2030,17 @@ function setPeriod(period, btn) {
 
 function getDateRange() {
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  const today = localToday();
   let from;
   if(_statsPeriod==='month') {
-    from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const d = new Date(now.toLocaleString('en-CA',{timeZone:'America/Toronto'}));
+    from = new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
   } else if(_statsPeriod==='3months') {
     const d = new Date(now); d.setMonth(d.getMonth()-3);
-    from = d.toISOString().split('T')[0];
+    from = d.toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
   } else if(_statsPeriod==='year') {
-    from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+    const d = new Date(now.toLocaleString('en-CA',{timeZone:'America/Toronto'}));
+    from = `${d.getFullYear()}-01-01`;
   } else {
     from = '2020-01-01';
   }
@@ -2396,9 +2466,13 @@ function renderCharts(allResas) {
 // ═══════════════════════════════════════════
 // CALENDRIER — vue côte à côte
 // ═══════════════════════════════════════════
+function localToday() {
+  return new Date().toLocaleDateString('en-CA', {timeZone:'America/Toronto'});
+}
+
 async function loadCalendrier(dateStr) {
   const collabs = await loadCollabs();
-  if(!dateStr) dateStr = new Date().toISOString().split('T')[0];
+  if(!dateStr) dateStr = localToday();
   const picker = document.getElementById('cal-date-picker');
   if(picker) picker.value = dateStr;
   const dt = new Date(dateStr+'T12:00:00');
@@ -2448,7 +2522,7 @@ async function loadCalendrier(dateStr) {
     return null;
   }
 
-  const slotStep = 30;
+  const slotStep = 15;
   const startH = isSat?8:9, endH = isSat?12:(dow>=4?20:17);
   const allSlots=[];
   for(let m=startH*60;m<endH*60;m+=slotStep) allSlots.push((Math.floor(m/60)+'').padStart(2,'0')+':'+(m%60+'').padStart(2,'0'));
@@ -2523,10 +2597,10 @@ async function loadCalendrier(dateStr) {
 
 function calNavDay(delta) {
   const picker = document.getElementById('cal-date-picker');
-  const current = picker.value || new Date().toISOString().split('T')[0];
+  const current = picker.value || localToday();
   const dt = new Date(current + 'T12:00:00');
   dt.setDate(dt.getDate() + delta);
-  loadCalendrier(dt.toISOString().split('T')[0]);
+  loadCalendrier(dt.toLocaleDateString('en-CA',{timeZone:'America/Toronto'}));
 }
 
 async function openResaById(id) {
@@ -2842,7 +2916,7 @@ function openNewResaFromClient(clientId, prenom, nom, tel, email) {
   // Ouvre le modal de création RDV avec le client déjà identifié
   newResaClientId = clientId;
   // Prendre la date d'aujourd'hui par défaut
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   document.getElementById('new-resa-date').value = today;
   document.getElementById('new-resa-time').value = '09:00';
   // Pré-remplir le barbier avec le premier disponible
@@ -3607,6 +3681,95 @@ function copyToClipboard(text, msg) {
     document.body.removeChild(el);
     showToast(msg||'Copié !','ok');
   });
+}
+
+// ══════════════════════════════════════
+// SERVICES — CRUD
+// ══════════════════════════════════════
+
+async function loadServices() {
+  const tbody = document.getElementById('services-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Chargement...</td></tr>';
+
+  const {data, error} = await sb.from('services').select('*').order('ordre').order('nom');
+  if(error || !data) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red);text-align:center;padding:1rem">Erreur de chargement.</td></tr>';
+    return;
+  }
+  if(data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Aucun service. Cliquez sur + Ajouter.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(s => `
+    <tr>
+      <td><strong>${s.nom}</strong></td>
+      <td style="color:var(--dim2);font-size:0.82rem">${s.description||'—'}</td>
+      <td style="color:var(--gold);font-weight:600">${s.prix}$</td>
+      <td>${s.duree} min</td>
+      <td><span style="color:${s.actif?'var(--green)':'var(--red)'}">
+        ${s.actif?'✅ Actif':'🔴 Inactif'}</span></td>
+      <td style="font-size:0.82rem">${s.hors_heures?'⭐ Oui':'—'}</td>
+      <td>
+        <button class="btn-sm btn-gold-sm" onclick="openServiceModal(${JSON.stringify(s).replace(/"/g,'&quot;')})">✏️</button>
+        <button class="btn-sm" style="background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3);padding:0.3rem 0.6rem;font-size:0.75rem;cursor:pointer;margin-left:0.3rem" onclick="deleteService('${s.id}','${s.nom}')">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openServiceModal(svc) {
+  document.getElementById('svc-id').value = svc?.id || '';
+  document.getElementById('svc-nom').value = svc?.nom || '';
+  document.getElementById('svc-description').value = svc?.description || '';
+  document.getElementById('svc-prix').value = svc?.prix || '';
+  document.getElementById('svc-duree').value = svc?.duree || 30;
+  document.getElementById('svc-ordre').value = svc?.ordre || 0;
+  document.getElementById('svc-actif').checked = svc ? svc.actif : true;
+  document.getElementById('svc-hors-heures').checked = svc?.hors_heures || false;
+  document.getElementById('modal-service-title').textContent = svc ? '✏️ MODIFIER SERVICE' : '💈 NOUVEAU SERVICE';
+  document.getElementById('modal-service').style.display = 'flex';
+}
+
+function closeServiceModal() {
+  document.getElementById('modal-service').style.display = 'none';
+}
+
+async function saveService() {
+  const id    = document.getElementById('svc-id').value;
+  const nom   = document.getElementById('svc-nom').value.trim();
+  const prix  = parseFloat(document.getElementById('svc-prix').value);
+  const duree = parseInt(document.getElementById('svc-duree').value);
+  if(!nom || isNaN(prix) || isNaN(duree)) { showToast('Nom, prix et durée sont requis.','error'); return; }
+
+  const payload = {
+    nom,
+    description: document.getElementById('svc-description').value.trim() || null,
+    prix,
+    duree,
+    ordre: parseInt(document.getElementById('svc-ordre').value)||0,
+    actif: document.getElementById('svc-actif').checked,
+    hors_heures: document.getElementById('svc-hors-heures').checked
+  };
+
+  let error;
+  if(id) {
+    ({error} = await sb.from('services').update(payload).eq('id', id));
+  } else {
+    ({error} = await sb.from('services').insert(payload));
+  }
+
+  if(error) { showToast('Erreur: '+error.message,'error'); return; }
+  showToast(id ? 'Service mis à jour ✅' : 'Service créé ✅','ok');
+  closeServiceModal();
+  loadServices();
+}
+
+async function deleteService(id, nom) {
+  if(!confirm(`Supprimer le service "${nom}" ?`)) return;
+  const {error} = await sb.from('services').delete().eq('id', id);
+  if(error) { showToast('Erreur: '+error.message,'error'); return; }
+  showToast('Service supprimé','ok');
+  loadServices();
 }
 
 function showToast(msg, type='') {
