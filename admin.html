@@ -1806,18 +1806,22 @@ async function openClientModal(clientId) {
         }).join('')}
     </div>`;
 
+  const _blockBtn = client.est_bloque
+    ? '<button class="btn-sm btn-success" onclick="unblockClient(\'' + clientId + '\');closeModal(\'modal-client\')">Débloquer</button>'
+    : '<button class="btn-sm btn-danger" onclick="closeModal(\'modal-client\');openBlockModal(\'' + clientId + '\',\'' + client.prenom + ' ' + client.nom + '\')">Bloquer</button>';
+  const _tel = (client.telephone||'').replace(/'/g,'');
+  const _email = (client.email||'').replace(/'/g,'');
+
   document.getElementById('modal-client-footer').innerHTML = `
     <button class="btn-sm" style="background:transparent;color:var(--dim2);border:1px solid var(--gold4)"
       onclick="closeModal('modal-client')">Fermer</button>
     <button class="btn-sm btn-info" onclick="openEditClientModal('${clientId}')">✏️ Modifier</button>
     <button class="btn-sm btn-gold-sm" onclick="saveClientNote('${clientId}')">Sauvegarder note</button>
     <button class="btn-sm" style="background:rgba(201,168,76,0.15);border:1px solid var(--gold);color:var(--gold);font-weight:700"
-      onclick="closeModal('modal-client');openNewResaFromClient('${clientId}','${client.prenom}','${client.nom}','${client.telephone||''}','${client.email||''}')">
+      onclick="closeModal('modal-client');openNewResaFromClient('${clientId}','${client.prenom}','${client.nom}','${_tel}','${_email}')">
       ✂ Prendre un RDV
     </button>
-    ${client.est_bloque
-      ?`<button class="btn-sm btn-success" onclick="unblockClient('${clientId}');closeModal('modal-client')">Débloquer</button>`
-      :`<button class="btn-sm btn-danger" onclick="closeModal('modal-client');openBlockModal('${clientId}','${client.prenom} ${client.nom}')">Bloquer</button>`}
+    ${_blockBtn}
   `;
 
   document.getElementById('modal-client').classList.add('open');
@@ -3695,8 +3699,9 @@ async function loadServices() {
   const {data, error} = await sb.from('services').select('*').order('ordre').order('nom');
   if(error || !data) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red);text-align:center;padding:1rem">Erreur de chargement.</td></tr>'; return; }
   if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Aucun service. Cliquez sur + Ajouter.</td></tr>'; return; }
-  tbody.innerHTML = data.map(s => `
-    <tr>
+  const rows = data.map(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
       <td><strong>${s.nom}</strong></td>
       <td style="color:var(--dim2);font-size:0.82rem">${s.description||'—'}</td>
       <td style="color:var(--gold);font-weight:600">${s.prix}$</td>
@@ -3704,12 +3709,16 @@ async function loadServices() {
       <td><span style="color:${s.actif?'var(--green)':'var(--red)'}">${s.actif?'✅ Actif':'🔴 Inactif'}</span></td>
       <td style="font-size:0.82rem">${s.hors_heures?'⭐ Oui':'—'}</td>
       <td>
-        <button class="btn-sm btn-gold-sm" onclick='openServiceModal(${JSON.stringify(s)})'>✏️</button>
-        <button class="btn-sm" style="background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3);padding:0.3rem 0.6rem;font-size:0.75rem;cursor:pointer;margin-left:0.3rem" onclick="deleteService('${s.id}','${s.nom.replace(/'/g,\"\\'\")}')">🗑</button>
-      </td>
-    </tr>`).join('');
+        <button class="btn-sm btn-gold-sm">✏️</button>
+        <button class="btn-sm" style="background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3);padding:0.3rem 0.6rem;font-size:0.75rem;cursor:pointer;margin-left:0.3rem">🗑</button>
+      </td>`;
+    tr.querySelectorAll('button')[0].onclick = () => openServiceModal(s);
+    tr.querySelectorAll('button')[1].onclick = () => deleteService(s.id, s.nom);
+    return tr;
+  });
+  tbody.innerHTML = '';
+  rows.forEach(tr => tbody.appendChild(tr));
 }
-
 function openServiceModal(svc) {
   document.getElementById('svc-id').value = svc?.id || '';
   document.getElementById('svc-nom').value = svc?.nom || '';
