@@ -76,7 +76,36 @@ exports.handler = async (event) => {
     }).catch(()=>{});
   }
 
-  if (!email) return { statusCode: 200, body: JSON.stringify({ ok: true, smsOnly: true }) };
+  if (!email) {
+    // Pas d'email client, mais on notifie quand même Barbara
+    if (RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+          to: ['barbearas.pro@gmail.com'],
+          subject: `📅 Nouveau RDV — ${prenom} · ${date} à ${heure}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #C9A84C">
+              <h2 style="color:#C9A84C;letter-spacing:2px">📅 NOUVEAU RENDEZ-VOUS</h2>
+              <div style="border:1px solid rgba(201,168,76,0.3);padding:20px;margin:20px 0">
+                <p style="margin:5px 0"><strong style="color:#C9A84C">👤 Client :</strong> ${prenom}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">📞 Tél :</strong> ${tel || '—'}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">📅 Date :</strong> ${date}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">🕐 Heure :</strong> ${heure}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">✂ Service :</strong> ${service}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">👤 Barbier·ère :</strong> ${barbier}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">💰 Prix :</strong> ${prix} + taxes</p>
+                ${note ? `<div style="margin-top:12px;padding:10px;background:rgba(201,168,76,0.08);border-left:3px solid #C9A84C"><strong style="color:#C9A84C">📝 Note :</strong> ${note}</div>` : ''}
+              </div>
+              <a href="https://barbe-a-ras.ca/admin" style="display:inline-block;background:#C9A84C;color:#080808;padding:10px 25px;text-decoration:none;font-weight:700">Voir le panel admin</a>
+            </div>`
+        })
+      }).catch(() => {});
+    }
+    return { statusCode: 200, body: JSON.stringify({ ok: true, smsOnly: true }) };
+  }
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;background:#f5f0e8;padding:20px">
     <div style="max-width:600px;margin:0 auto;background:#080808;color:#f5f0e8;border-top:4px solid #C9A84C">
@@ -109,5 +138,37 @@ exports.handler = async (event) => {
   });
 
   const result = await resp.json();
+
+  // Notification à Barbara
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+      to: ['barbearas.pro@gmail.com'],
+      subject: `📅 Nouveau RDV — ${prenom} ${data.nom || ''} · ${date} à ${heure}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #C9A84C">
+          <h2 style="color:#C9A84C;letter-spacing:2px">📅 NOUVEAU RENDEZ-VOUS</h2>
+          <p>Une nouvelle réservation vient d'être confirmée :</p>
+          <div style="border:1px solid rgba(201,168,76,0.3);padding:20px;margin:20px 0">
+            <p style="margin:5px 0"><strong style="color:#C9A84C">👤 Client :</strong> ${prenom} ${data.nom || ''}</p>
+            <p style="margin:5px 0"><strong style="color:#C9A84C">📞 Tél :</strong> ${tel || '—'}</p>
+            <p style="margin:5px 0"><strong style="color:#C9A84C">📅 Date :</strong> ${date}</p>
+            <p style="margin:5px 0"><strong style="color:#C9A84C">🕐 Heure :</strong> ${heure}</p>
+            <p style="margin:5px 0"><strong style="color:#C9A84C">✂ Service :</strong> ${service}</p>
+            <p style="margin:5px 0"><strong style="color:#C9A84C">👤 Barbier·ère :</strong> ${barbier}</p>
+            <p style="margin:5px 0"><strong style="color:#C9A84C">💰 Prix :</strong> ${prix} + taxes</p>
+            ${note ? `<div style="margin-top:12px;padding:10px;background:rgba(201,168,76,0.08);border-left:3px solid #C9A84C">
+              <strong style="color:#C9A84C">📝 Note du client :</strong><br>
+              <span style="color:#f5f0e8">${note}</span>
+            </div>` : ''}
+          </div>
+          <a href="https://barbe-a-ras.ca/admin" style="display:inline-block;background:#C9A84C;color:#080808;padding:10px 25px;text-decoration:none;font-weight:700;margin-top:10px">Voir le panel admin</a>
+          <p style="font-size:12px;color:rgba(245,240,232,0.3);margin-top:20px">Barbe-À-Ras Admin · Ce message est envoyé automatiquement</p>
+        </div>`
+    })
+  }).catch(() => {});
+
   return { statusCode: 200, body: JSON.stringify({ ok: true, emailId: result.id }) };
 };
