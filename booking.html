@@ -1363,15 +1363,25 @@ async function loadBookingServices() {
     if(horsHeures.length) html += '<div class="svc-cat">⏰ Hors heures <span style="font-size:0.55rem;opacity:0.6">(appeler)</span></div>' + horsHeures.map(renderSvc).join('');
     container.innerHTML = html;
 
-    sb.channel('booking-services')
-      .on('postgres_changes',{event:'*',schema:'public',table:'services'},()=>loadBookingServices())
-      .subscribe();
+    // Remettre les sélections en cours si l'utilisateur avait déjà choisi des services
+    S.services.forEach(sel => {
+      const el = container.querySelector(`[data-name="${sel.name.replace(/"/g,'&quot;')}"]`);
+      if(el) el.classList.add('selected');
+    });
 
   } catch(e) {
     console.error('[Services] Exception:', e);
   }
 }
 loadBookingServices();
+
+// Canal Realtime services — créé UNE SEULE FOIS
+sb.channel('booking-services')
+  .on('postgres_changes', {event:'*', schema:'public', table:'services'}, () => {
+    console.log('[Realtime] Services modifiés — rechargement');
+    loadBookingServices();
+  })
+  .subscribe();
 
 // Charger les mini avis
 (async function() {
