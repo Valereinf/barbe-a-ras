@@ -449,6 +449,14 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const FR_M=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const FR_D=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 
+// Utilitaire fuseau horaire Québec
+function localDateStr(dateObj) {
+  return dateObj.toLocaleDateString('en-CA', {timeZone:'America/Toronto'});
+}
+function localToday() {
+  return localDateStr(new Date());
+}
+
 let S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
 let _bookingCollabs=[];
 
@@ -615,7 +623,7 @@ async function ensureHoraires() {
 // Retourne {start, end} en minutes pour un barbier un jour donné (depuis Supabase ou défaut)
 function getBarberDayRange(barber, dt) {
   const dow = dt.getDay();
-  const dateStr = dt.toISOString().split('T')[0];
+  const dateStr = localDateStr(dt);
 
   // 1. Vérifier les exceptions de période en premier
   if(_horairesExceptions && _horairesExceptions[barber]) {
@@ -759,7 +767,7 @@ async function selDay(d,dt,el){
   document.getElementById('waitlist-banner').style.display='none';
   document.getElementById('time-sec').style.display='none';
   showOverlay('Vérification des disponibilités...');
-  const dateStr=dt.toISOString().split('T')[0];
+  const dateStr=localDateStr(dt);
   const requestedDur = getTotalDur() || 30;
 
   // Toujours recharger depuis Supabase pour refléter les modifs de Barbara
@@ -999,7 +1007,7 @@ async function submitBooking(){
   } else {
     await sb.from('clients').update({prenom,nom,email:email||null}).eq('id',clientId);
   }
-  const dateStr=S.date.toISOString().split('T')[0];
+  const dateStr=localDateStr(S.date);
   const newSvcNames=getSvcNames();
   const newPrice=getTotalPrice();
 
@@ -1080,7 +1088,7 @@ async function submitWaitlist(){
   const {data:ex}=await sb.from('clients').select('id').eq('telephone',telClean).maybeSingle();
   if(ex){clientId=ex.id;}
   else{const {data:nc}=await sb.from('clients').insert({prenom,nom,telephone:telClean,email:email||null}).select('id').single();clientId=nc?.id;}
-  const dateStr=S.date?S.date.toISOString().split('T')[0]:null;
+  const dateStr=S.date?localDateStr(S.date):null;
   await sb.from('liste_attente').insert({client_id:clientId,service:getSvcNames()||'Non précisé',barbier:S.barber||'Sans préférence',date_souhaitee:dateStr,heure_souhaitee:'09:00',statut:'en_attente'});
   hideOverlay();
   ['sc-waitlist'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
@@ -1186,7 +1194,7 @@ async function submitPeriodicBooking() {
     barbier: finalBarber,
     service: svcNames,
     prix: totalPrice,
-    date_rdv: d.toISOString().split('T')[0],
+    date_rdv: localDateStr(d),
     heure_rdv: S.time,
     statut: 'confirmé',
     note_client: note||null,
@@ -1427,7 +1435,7 @@ function initBookingRealtime() {
       // Si une date est sélectionnée et qu'une résa change sur ce jour → recharger les créneaux
       if(S.date) {
         const changedDate = payload.new?.date_rdv || payload.old?.date_rdv;
-        const selectedDate = S.date.toISOString().split('T')[0];
+        const selectedDate = localDateStr(S.date);
         if(changedDate === selectedDate) {
           console.log('[Realtime] réservation changée sur la date sélectionnée — rechargement créneaux');
           // Revider le cache et recharger silencieusement
