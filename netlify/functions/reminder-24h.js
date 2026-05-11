@@ -109,7 +109,7 @@ exports.handler = async () => {
     }
 
     // 3. Send notification email to BARBARA (staff)
-    const BARBARA_EMAIL = 'ngakambarbara@yahoo.fr';
+    const BARBARA_EMAIL = 'barbearas.pro@gmail.com';
     if (RESEND_API_KEY) {
       try {
         await fetch('https://api.resend.com/emails', {
