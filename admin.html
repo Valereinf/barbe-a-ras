@@ -584,6 +584,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
     </div>
 
       <!-- TAB: AVIS CLIENTS -->
+      <!-- TAB: SERVICES -->
       <div class="tab" id="tab-services">
         <div class="sec-head">
           <h2>💈 <span>Services</span></h2>
@@ -3691,28 +3692,20 @@ async function loadServices() {
   const tbody = document.getElementById('services-tbody');
   if(!tbody) return;
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Chargement...</td></tr>';
-
   const {data, error} = await sb.from('services').select('*').order('ordre').order('nom');
-  if(error || !data) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red);text-align:center;padding:1rem">Erreur de chargement.</td></tr>';
-    return;
-  }
-  if(data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Aucun service. Cliquez sur + Ajouter.</td></tr>';
-    return;
-  }
+  if(error || !data) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red);text-align:center;padding:1rem">Erreur de chargement.</td></tr>'; return; }
+  if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--dim2);padding:2rem">Aucun service. Cliquez sur + Ajouter.</td></tr>'; return; }
   tbody.innerHTML = data.map(s => `
     <tr>
       <td><strong>${s.nom}</strong></td>
       <td style="color:var(--dim2);font-size:0.82rem">${s.description||'—'}</td>
       <td style="color:var(--gold);font-weight:600">${s.prix}$</td>
       <td>${s.duree} min</td>
-      <td><span style="color:${s.actif?'var(--green)':'var(--red)'}">
-        ${s.actif?'✅ Actif':'🔴 Inactif'}</span></td>
+      <td><span style="color:${s.actif?'var(--green)':'var(--red)'}">${s.actif?'✅ Actif':'🔴 Inactif'}</span></td>
       <td style="font-size:0.82rem">${s.hors_heures?'⭐ Oui':'—'}</td>
       <td>
-        <button class="btn-sm btn-gold-sm" onclick="openServiceModal(${JSON.stringify(s).replace(/"/g,'&quot;')})">✏️</button>
-        <button class="btn-sm" style="background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3);padding:0.3rem 0.6rem;font-size:0.75rem;cursor:pointer;margin-left:0.3rem" onclick="deleteService('${s.id}','${s.nom}')">🗑</button>
+        <button class="btn-sm btn-gold-sm" onclick='openServiceModal(${JSON.stringify(s)})'>✏️</button>
+        <button class="btn-sm" style="background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.3);padding:0.3rem 0.6rem;font-size:0.75rem;cursor:pointer;margin-left:0.3rem" onclick="deleteService('${s.id}','${s.nom.replace(/'/g,\"\\'\")}')">🗑</button>
       </td>
     </tr>`).join('');
 }
@@ -3740,24 +3733,17 @@ async function saveService() {
   const prix  = parseFloat(document.getElementById('svc-prix').value);
   const duree = parseInt(document.getElementById('svc-duree').value);
   if(!nom || isNaN(prix) || isNaN(duree)) { showToast('Nom, prix et durée sont requis.','error'); return; }
-
   const payload = {
     nom,
     description: document.getElementById('svc-description').value.trim() || null,
-    prix,
-    duree,
+    prix, duree,
     ordre: parseInt(document.getElementById('svc-ordre').value)||0,
     actif: document.getElementById('svc-actif').checked,
     hors_heures: document.getElementById('svc-hors-heures').checked
   };
-
-  let error;
-  if(id) {
-    ({error} = await sb.from('services').update(payload).eq('id', id));
-  } else {
-    ({error} = await sb.from('services').insert(payload));
-  }
-
+  const {error} = id
+    ? await sb.from('services').update(payload).eq('id', id)
+    : await sb.from('services').insert(payload);
   if(error) { showToast('Erreur: '+error.message,'error'); return; }
   showToast(id ? 'Service mis à jour ✅' : 'Service créé ✅','ok');
   closeServiceModal();
