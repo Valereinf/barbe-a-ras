@@ -105,7 +105,7 @@ exports.handler = async (event) => {
         headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
-          to: ['ngakambarbara@yahoo.fr'],
+          to: ['barbearas.pro@gmail.com'],
           subject: `🔄 Modification RDV — ${clientPrenom} ${clientNom} → ${new_date} à ${new_time}`,
           html: `
             <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #C9A84C">
@@ -207,7 +207,7 @@ exports.handler = async (event) => {
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
-        to: ['ngakambarbara@yahoo.fr'],
+        to: ['barbearas.pro@gmail.com'],
         subject: `❌ Annulation — ${resa.clients?.prenom} ${resa.clients?.nom} — ${resa.date_rdv} à ${resa.heure_rdv?.substring(0,5)}`,
         html: `
           <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #e74c3c">
