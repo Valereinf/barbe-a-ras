@@ -313,7 +313,7 @@ async function init() {
 }
 
 async function loadRDV() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
   const {data:resas} = await sb.from('reservations').select('*')
     .eq('client_id', clientData.id).order('date_rdv',{ascending:false});
   const upcoming = (resas||[]).filter(r=>r.date_rdv>=today&&r.statut==='confirmé');
@@ -324,7 +324,7 @@ async function loadRDV() {
     ? `<div class="empty"><div class="empty-icon">📅</div><p>Aucun rendez-vous à venir</p></div>`
     : upcoming.map(r=>{
         const dl = new Date(r.date_rdv+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-        const canCancel = (new Date(r.date_rdv+'T'+r.heure_rdv)-new Date())>3*60*60*1000;
+        const canCancel = (new Date(r.date_rdv+'T'+r.heure_rdv+'-04:00')-new Date())>3*60*60*1000;
         return `<div class="rdv-card upcoming">
           <div class="rdv-header"><div class="rdv-date">${dl}</div><span class="rdv-badge badge-confirme">Confirmé</span></div>
           <div class="rdv-details">
