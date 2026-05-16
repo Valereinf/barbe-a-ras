@@ -205,12 +205,28 @@ async function doSignup() {
   // Créer le compte Auth
   const {data:authData, error:authError} = await sb.auth.signUp({
     email, password: pwd,
-    options: { data: { prenom, nom, tel } }
+    options: {
+      data: { prenom, nom, tel },
+      emailRedirectTo: null  // Pas de confirmation email requise
+    }
   });
 
   if(authError) {
-    const msg = authError.message.includes('already') ? 'Un compte existe déjà avec cet email.' : authError.message;
-    showError(msg); btn.innerHTML = 'Créer mon compte'; btn.disabled = false;
+    // "email rate limit" = trop de tentatives récentes
+    if(authError.message.toLowerCase().includes('rate limit') || authError.message.toLowerCase().includes('email')) {
+      showError('Trop de tentatives. Attendez quelques minutes et réessayez, ou appelez le (418) 612-2007.');
+    } else {
+      const msg = authError.message.includes('already') ? 'Un compte existe déjà avec cet email.' : authError.message;
+      showError(msg);
+    }
+    btn.innerHTML = 'Créer mon compte'; btn.disabled = false;
+    return;
+  }
+
+  // Si Supabase retourne identityData vide (rate limit silencieux), détecter
+  if(!authData?.user) {
+    showError('Impossible de créer le compte pour le moment. Réessayez dans quelques minutes.');
+    btn.innerHTML = 'Créer mon compte'; btn.disabled = false;
     return;
   }
 
@@ -238,7 +254,13 @@ async function doSignup() {
     });
   }
 
-  showSuccess('Compte créé ! Vérifiez votre courriel pour confirmer votre adresse.');
+  // Connexion automatique après inscription (si confirmé sans email)
+  if(authData.session) {
+    // Compte créé et session active → rediriger directement
+    window.location.href = '/mon-compte.html';
+    return;
+  }
+  showSuccess('Compte créé ! Vous pouvez maintenant vous connecter.');
   btn.innerHTML = 'Créer mon compte'; btn.disabled = false;
 }
 
