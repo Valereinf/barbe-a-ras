@@ -1646,7 +1646,16 @@ async function confirmerAbsent() {
 
 async function cancelResa(id) {
   if(!confirm('Annuler ce rendez-vous ?')) return;
-  await sb.from('reservations').update({statut:'annulé'}).eq('id',id);
+  // Récupérer le token d'annulation pour notifier le client
+  const resa = allResa.find(r=>r.id===id);
+  const token = resa?.cancel_token;
+  if(token) {
+    // Notifier via cancel-booking (email + SMS + liste d'attente)
+    await fetch(`/.netlify/functions/cancel-booking?token=${token}&id=${id}`).catch(()=>{});
+  } else {
+    // Pas de token (RDV créé par admin) : annuler directement dans Supabase
+    await sb.from('reservations').update({statut:'annulé'}).eq('id',id);
+  }
   showToast('Rendez-vous annulé','ok');
   loadAll();
 }
@@ -1828,14 +1837,26 @@ async function openClientModal(clientId) {
 
 async function annulerResaDepuisFiche(resaId, date, heure) {
   if(!confirm(`Annuler le RDV du ${date} à ${heure} ?`)) return;
-  const {error} = await sb.from('reservations')
-    .update({statut:'annulé', cancel_token: null})
-    .eq('id', resaId);
-  if(error) { showToast('Erreur annulation', 'error'); return; }
-  showToast('✅ Réservation annulée');
+  // Récupérer le token pour notifier le client
+  const resa = allResa.find(r=>r.id===resaId);
+  const token = resa?.cancel_token;
+  if(token) {
+    // Notifier via cancel-booking (email + SMS + liste d'attente)
+    const resp = await fetch(`/.netlify/functions/cancel-booking?token=${token}&id=${resaId}`).catch(()=>null);
+    if(!resp || !resp.ok) {
+      // Fallback : annuler directement
+      await sb.from('reservations').update({statut:'annulé', cancel_token: null}).eq('id', resaId);
+    }
+  } else {
+    // Pas de token : annuler directement
+    const {error} = await sb.from('reservations')
+      .update({statut:'annulé', cancel_token: null})
+      .eq('id', resaId);
+    if(error) { showToast('Erreur annulation', 'error'); return; }
+  }
+  showToast('✅ Réservation annulée + client notifié');
   loadAll();
   // Recharger la fiche client
-  const resa = allResa.find(r=>r.id===resaId);
   if(resa?.client_id) {
     setTimeout(()=>openClientModal(resa.client_id), 500);
   } else {
@@ -2533,7 +2554,19 @@ async function loadCalendrier(dateStr) {
 
   calGrid.innerHTML = collabs.map((c,ci) => {
     const booked = {};
-    (resaResps[ci]?.data||[]).forEach(r=>{ booked[r.heure_rdv.substring(0,5)]=r; });
+    // Construire booked[] en marquant TOUS les slots couverts par chaque RDV
+    (resaResps[ci]?.data||[]).forEach(r=>{
+      const startM = toM(r.heure_rdv.substring(0,5));
+      // Durée depuis SVC_DUR ou fallback 30min
+      const dur = (typeof SVC_DUR !== 'undefined' && SVC_DUR[r.service]) || 30;
+      // Marquer le slot de début avec le RDV complet
+      booked[r.heure_rdv.substring(0,5)] = r;
+      // Marquer les slots suivants couverts par la durée (sans le RDV, juste bloqués)
+      for(let m = startM + slotStep; m < startM + dur; m += slotStep) {
+        const t = (Math.floor(m/60)+'').padStart(2,'0') + ':' + (m%60+'').padStart(2,'0');
+        if(!booked[t]) booked[t] = { _blocked: true, _parentResa: r };
+      }
+    });
     const isBlocked = indis.some(i=>i.barbier===c.nom||i.barbier==='Tous');
 
     // Horaires et pauses du collaborateur ce jour
@@ -2552,7 +2585,13 @@ async function loadCalendrier(dateStr) {
           const r = booked[t];
           const tM = toM(t);
           const inPause = pauses.find(p=>tM>=toM(p.debut)&&tM<toM(p.fin));
-          if(r) {
+          if(r && r._blocked) {
+            // Slot occupé par un RDV en cours (ex: 09:15 occupé par RDV de 09:00 pendant 30min)
+            return `<div class="cal-slot booked" style="opacity:0.45;cursor:default" title="Occupé par le RDV de ${r._parentResa?.clients?.prenom||''} (${r._parentResa?.heure_rdv?.substring(0,5)||''})">
+              <span class="slot-time">${t}</span>
+              <div class="slot-info"><div class="slot-svc" style="color:var(--dim2);font-size:0.72rem">⏱ En cours</div></div>
+            </div>`;
+          } else if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
             const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
             const hasPref = r.avec_preference === true;
