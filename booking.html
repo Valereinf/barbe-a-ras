@@ -285,6 +285,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:300;height:70px;
           <div class="summary-row"><span class="lbl">Date & heure</span><span class="val" id="s-dt">—</span></div>
           <div class="summary-total"><span class="lbl">Total (+ taxes)</span><span class="val" id="s-price">—</span></div>
         </div>
+        <!-- Badge client connecté - affiché par JS si session active -->
+        <div id="client-logged-badge" style="display:none;background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.3);padding:0.7rem 1rem;margin-bottom:1rem;border-radius:2px">
+          <span style="font-size:0.78rem;color:#27ae60;letter-spacing:0.5px">✅ Connecté — vos informations sont pré-remplies.</span>
+          <a href="/mon-compte.html" style="color:#C9A84C;text-decoration:none;font-size:0.78rem;margin-left:0.5rem">Mon compte →</a>
+        </div>
         <div class="form-grid">
           <div class="form-row">
             <div class="form-group"><label>Prénom *</label><input type="text" id="f-prenom" placeholder="Jean" required oninput="chkForm()"></div>
@@ -500,14 +505,9 @@ let _bookingCollabs=[];
       });
       // Afficher un badge "Connecté" dans le formulaire
       const prenomEl = document.getElementById('f-prenom');
-      if (prenomEl && !document.getElementById('client-logged-badge')) {
-        const badge = document.createElement('div');
-        badge.id = 'client-logged-badge';
-        badge.style.cssText = 'font-size:0.72rem;color:var(--green,#27ae60);margin-bottom:0.8rem;letter-spacing:1px;display:flex;align-items:center;gap:0.4rem';
-        badge.innerHTML = '✅ Connecté — vos informations sont pré-remplies. <a href="/mon-compte.html" style="color:var(--gold,#C9A84C);text-decoration:none">Mon compte →</a>';
-        const formStep = prenomEl.closest('.booking-form') || prenomEl.closest('section') || prenomEl.parentElement?.parentElement;
-        if (formStep) formStep.insertBefore(badge, formStep.firstChild);
-      }
+      // Afficher le badge "Connecté" (déjà dans le HTML, juste caché)
+      const badgeEl = document.getElementById('client-logged-badge');
+      if (badgeEl) badgeEl.style.display = 'block';
     };
 
     // Si l'étape 4 (infos) est déjà visible, remplir maintenant
