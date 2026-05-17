@@ -3085,13 +3085,42 @@ async function saveNewResa() {
   }
   if(!clientId){ showToast('Impossible de créer ou retrouver le client', 'error'); return; }
 
-  await sb.from('reservations').insert({
+  const {data:newResa, error:resaErr} = await sb.from('reservations').insert({
     client_id:clientId, barbier, service, prix,
     date_rdv:date, heure_rdv:time+':00',
     statut:'confirmé', note_client:note
-  });
+  }).select('id').single();
 
-  showToast('RDV créé avec succès ✅','ok');
+  if(resaErr) { showToast('Erreur création RDV: '+resaErr.message,'error'); return; }
+
+  // Récupérer les infos complètes du client pour la notification
+  const {data:clientData} = await sb.from('clients').select('prenom,nom,telephone,email').eq('id',clientId).single();
+
+  // Envoyer SMS + email de confirmation au client
+  if(newResa?.id && clientData) {
+    const dateFormatted = new Date(date+'T12:00:00').toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    try {
+      await fetch('/.netlify/functions/send-confirmation', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          reservationId: newResa.id,
+          prenom: clientData.prenom,
+          nom: clientData.nom,
+          email: clientData.email || '',
+          tel: clientData.telephone || '',
+          barbier, service, prix,
+          date: dateFormatted,
+          heure: time,
+          note: note || ''
+        })
+      });
+    } catch(e) {
+      console.error('Erreur notification:', e);
+    }
+  }
+
+  showToast('RDV créé + client notifié ✅','ok');
   closeModal('modal-new-resa');
   loadAll();
   loadCalendrier(date);
