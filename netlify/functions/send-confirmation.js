@@ -48,6 +48,74 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ ok: true, type: 'penalty-sent' }) };
   }
 
+  // ── CAS ADMIN : annulation par Barbara ──
+  if (data.type === 'admin-cancel') {
+    const { prenom, nom, email, tel, barbier, service, prix, date, heure } = data;
+    const TWILIO_SID = process.env.TWILIO_SID;
+    const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
+    const TWILIO_PHONE = process.env.TWILIO_PHONE;
+
+    // SMS au client
+    if (tel && TWILIO_SID && TWILIO_TOKEN && TWILIO_PHONE) {
+      const telClean = tel.replace(/\D/g,'').slice(-10);
+      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ From: TWILIO_PHONE, To: '+1' + telClean,
+          Body: `Bonjour ${prenom}, votre RDV du ${date} à ${heure} chez Barbe-À-Ras a été annulé. Pour reprendre un RDV: barbe-a-ras.ca/booking. Info: (418) 612-2007`
+        }).toString()
+      }).catch(()=>{});
+    }
+
+    // Email au client
+    if (email && RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+          to: [email],
+          subject: `❌ Rendez-vous annulé — ${date} à ${heure} | Barbe-À-Ras`,
+          html: `
+            <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #e74c3c">
+              <h2 style="color:#e74c3c;letter-spacing:2px">❌ RENDEZ-VOUS ANNULÉ</h2>
+              <p>Bonjour <strong>${prenom}</strong>,</p>
+              <p>Votre rendez-vous chez <strong style="color:#C9A84C">Barbe-À-Ras</strong> a été annulé :</p>
+              <div style="border:1px solid rgba(231,76,60,0.3);padding:20px;margin:20px 0">
+                <p style="margin:5px 0"><strong style="color:#C9A84C">📅 Date :</strong> ${date}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">🕐 Heure :</strong> ${heure}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">✂ Service :</strong> ${service}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">👤 Barbier·ère :</strong> ${barbier}</p>
+              </div>
+              <p style="font-size:13px;color:rgba(245,240,232,0.6)">Pour reprendre un rendez-vous :</p>
+              <a href="https://barbe-a-ras.ca/booking" style="display:inline-block;background:#C9A84C;color:#080808;padding:12px 30px;text-decoration:none;font-weight:700;letter-spacing:2px;margin-top:10px">Nouveau rendez-vous →</a>
+              <p style="margin-top:20px;font-size:12px;color:rgba(245,240,232,0.4)">Questions : (418) 612-2007 · Barbe-À-Ras · 749 Rue d'Alma, Local 101, Chicoutimi</p>
+            </div>`
+        })
+      }).catch(()=>{});
+    }
+
+    // Notifier Barbara aussi
+    if (RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+          to: ['barbearas.pro@gmail.com'],
+          subject: `❌ Annulation confirmée — ${prenom} ${nom} · ${date} à ${heure}`,
+          html: `<div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #e74c3c">
+            <h2 style="color:#e74c3c">❌ ANNULATION EFFECTUÉE</h2>
+            <p>Client <strong>${prenom} ${nom}</strong> — RDV du <strong>${date}</strong> à <strong>${heure}</strong> (${service}) annulé depuis la console admin.</p>
+            <a href="https://barbe-a-ras.ca/admin" style="display:inline-block;background:#C9A84C;color:#080808;padding:10px 25px;text-decoration:none;font-weight:700;margin-top:10px">Voir le panel admin</a>
+          </div>`
+        })
+      }).catch(()=>{});
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ ok: true, type: 'admin-cancel-sent' }) };
+  }
+
   // ── CAS NORMAL : confirmation de réservation ──
   const { reservationId, prenom, email, tel, barbier, service, prix, date, heure, note } = data;
 
