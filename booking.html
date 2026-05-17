@@ -464,6 +464,8 @@ function localToday() {
 
 let S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
 let _bookingCollabs=[];
+let _lastBusyIntervals = []; // Cache pour vérification chevauchement pause dans selTime
+let _lastBlockedSlots  = [];
 
 // ── AUTO-POPULATE depuis compte client connecté ──
 (async () => {
@@ -786,9 +788,9 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
     for(const b of allBusy) {
       // Réservations existantes : bloquer si overlap complet
       if(b.isPause) {
-        // Pause : bloquer si le service chevauche la pause
-        // (commence avant la fin de la pause ET se termine après le début)
-        if(slotStart < b.end && slotEnd > b.start) return false;
+        // Pause : bloquer seulement si le créneau COMMENCE pendant la pause
+        // (les créneaux avant la pause restent cliquables, vérification au moment de la sélection)
+        if(slotStart >= b.start && slotStart < b.end) return false;
       } else {
         // Réservation : overlap standard
         if(slotStart < b.end && slotEnd > b.start) return false;
@@ -800,14 +802,56 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
 }
 
 
-// Trouve le prochain slot disponible après un slot donné
-function getNextAvailableSlot(dt, busyIntervals, requestedDur, blockedSlots=[], barber=null, afterSlot=null) {
-  const available = getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots, barber);
-  if(!afterSlot) return available[0] || null;
-  const afterM = toMins(afterSlot);
-  // Chercher le premier slot disponible après afterSlot
-  const next = available.find(s => toMins(s) > afterM);
-  return next || available[0] || null;
+// Vérifie si un créneau empiète sur une pause avec la durée du service
+function slotOverlapsPause(slotTime, dur, barber, dt) {
+  const range = barber ? getBarberDayRange(barber, dt) : getSalonDayRange(dt);
+  if(!range || !range.pauses) return null;
+  const startM = toMins(slotTime);
+  const endM   = startM + dur;
+  for(const p of range.pauses) {
+    const pStart = toMins(p.debut);
+    const pEnd   = toMins(p.fin);
+    if(startM < pEnd && endM > pStart) {
+      return p; // Retourne la pause qui est chevauchée
+    }
+  }
+  return null; // Pas de chevauchement
+}
+
+// Trouve le créneau disponible le plus proche (avant ou après) qui ne chevauche pas de pause
+function getNearestValidSlot(slotTime, dur, barber, dt, busyIntervals, blockedSlots=[]) {
+  const range = barber ? getBarberDayRange(barber, dt) : getSalonDayRange(dt);
+  const dayEnd = range ? range.end : 20*60;
+  const slotM  = toMins(slotTime);
+
+  // Générer tous les slots de 15min dans la journée
+  const allSlots = getAllSlots15(dt, barber);
+
+  // Filtrer ceux qui sont disponibles ET ne chevauchent pas une pause
+  const validSlots = allSlots.filter(t => {
+    const tM   = toMins(t);
+    const tEnd = tM + dur;
+    if(tEnd > dayEnd) return false;
+    // Pas de chevauchement avec pause
+    if(slotOverlapsPause(t, dur, barber, dt)) return false;
+    // Pas de chevauchement avec réservation existante
+    for(const b of busyIntervals) {
+      if(tM < b.end && tEnd > b.start) return false;
+    }
+    if(blockedSlots.includes(t)) return false;
+    return true;
+  });
+
+  if(!validSlots.length) return null;
+
+  // Trouver le plus proche en distance (avant ou après)
+  let nearest = null;
+  let minDist  = Infinity;
+  for(const t of validSlots) {
+    const dist = Math.abs(toMins(t) - slotM);
+    if(dist < minDist) { minDist = dist; nearest = t; }
+  }
+  return nearest;
 }
 
 async function renderCal(){
@@ -890,7 +934,9 @@ async function selDay(d,dt,el){
     // Calculer avail pour chaque collaborateur
     const collabAvails = collabData.map(cd=>({
       ...cd,
-      avail: cd.blocked ? [] : getAvailableSlots(dt, cd.busy, requestedDur, cd.blockedSlots, cd.nom)
+      avail: cd.blocked ? [] : getAvailableSlots(dt, cd.busy, requestedDur, cd.blockedSlots, cd.nom),
+      busy: cd.busy,
+      blockedSlots: cd.blockedSlots
     }));
     // Trier : premier dispo d'abord (ordre Supabase)
     const anyAvail = collabAvails.some(ca=>ca.avail.length>0);
@@ -911,7 +957,8 @@ async function selDay(d,dt,el){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
       lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
-      const mRange=getBarberDayRange('Michael',dt);const mEnd=mRange?mRange.end:20*60;const mSlots=getAllSlots15(dt,'Michael').filter(t=>toMins(t)+requestedDur<=mEnd);renderSlots(grid,mSlots,availM,'Michael',dt,requestedDur);
+      const mRange=getBarberDayRange('Michael',dt);const mEnd=mRange?mRange.end:20*60;const mSlots=getAllSlots15(dt,'Michael').filter(t=>toMins(t)+requestedDur<=mEnd);_lastBusyIntervals = collabAvails[0]?.busy || []; _lastBlockedSlots = collabAvails[0]?.blockedSlots || [];
+      renderSlots(grid,mSlots,availM,'Michael',dt,requestedDur);
     }
     if(barbaraBlocked){
       const lbl2=document.createElement('div');
@@ -921,7 +968,8 @@ async function selDay(d,dt,el){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
-      const bRange=getBarberDayRange('Barbara Sandra',dt);const bEnd=bRange?bRange.end:20*60;const bSlots=getAllSlots15(dt,'Barbara Sandra').filter(t=>toMins(t)+requestedDur<=bEnd);renderSlots(grid,bSlots,availB,'Barbara Sandra',dt,requestedDur);
+      const bRange=getBarberDayRange('Barbara Sandra',dt);const bEnd=bRange?bRange.end:20*60;const bSlots=getAllSlots15(dt,'Barbara Sandra').filter(t=>toMins(t)+requestedDur<=bEnd);_lastBusyIntervals = collabAvails[1]?.busy || []; _lastBlockedSlots = collabAvails[1]?.blockedSlots || [];
+      renderSlots(grid,bSlots,availB,'Barbara Sandra',dt,requestedDur);
     }
     document.getElementById('time-sec').style.display='block';
   } else {
@@ -943,6 +991,7 @@ async function selDay(d,dt,el){
     const barberRange=getBarberDayRange(S.barber,dt);
     const dayEndSpec=barberRange?barberRange.end:20*60;
     const specSlots=getAllSlots15(dt,S.barber).filter(t=>toMins(t)+requestedDur<=dayEndSpec);
+    _lastBusyIntervals = cd?.busy || []; _lastBlockedSlots = cd?.blockedSlots || [];
     renderSlots(grid,specSlots,avail,S.barber,dt,requestedDur);
     document.getElementById('time-sec').style.display='block';
   }
@@ -1019,11 +1068,23 @@ function selTime(el,t,barberAssigned){
   const dur = getTotalDur();
   if(dur > 0 && S.date) {
     const startM = toMins(t);
-    const endM = startM + dur;
+    const endM   = startM + dur;
     const endLabel = String(Math.floor(endM/60)).padStart(2,'0') + ':' + String(endM%60).padStart(2,'0');
-    const dateStr = S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+    const dateStr  = S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
     const sdt = document.getElementById('s-dt');
     if(sdt) sdt.textContent = `${dateStr} de ${t} à ${endLabel}`;
+
+    // ── Vérifier si le service empiète sur une pause ──
+    const barber = S.assignedBarber || S.barber;
+    const pause  = slotOverlapsPause(t, dur, barber, S.date);
+    if(pause) {
+      // Trouver le créneau le plus proche sans chevauchement
+      const busy = _lastBusyIntervals || [];
+      const blocked = _lastBlockedSlots || [];
+      const suggestion = getNearestValidSlot(t, dur, barber, S.date, busy, blocked);
+
+      showPauseConflictModal(t, endLabel, pause, suggestion, barber);
+    }
   }
 }
 
@@ -1557,6 +1618,80 @@ function initBookingRealtime() {
 
 initBookingRealtime();
 
+let _suggestedSlot = null;
+let _suggestedBarber = null;
+
+function showPauseConflictModal(chosenSlot, endLabel, pause, suggestion, barber) {
+  const dur = getTotalDur();
+  const endM = toMins(chosenSlot) + dur;
+  const end  = String(Math.floor(endM/60)).padStart(2,'0')+':'+String(endM%60).padStart(2,'0');
+
+  let msg = `Le service choisi se termine à <strong>${end}</strong>, ce qui empiète sur la pause de <strong>${pause.debut} à ${pause.fin}</strong>.`;
+
+  if(suggestion) {
+    const sugEndM = toMins(suggestion) + dur;
+    const sugEnd  = String(Math.floor(sugEndM/60)).padStart(2,'0')+':'+String(sugEndM%60).padStart(2,'0');
+    msg += `<br><br>Le créneau disponible le plus proche est <strong style="color:#C9A84C">${suggestion} – ${sugEnd}</strong>.`;
+    document.getElementById('pause-conflict-accept').style.display = 'inline-block';
+    document.getElementById('pause-conflict-accept').textContent = `Prendre ${suggestion} →`;
+    _suggestedSlot   = suggestion;
+    _suggestedBarber = barber;
+  } else {
+    msg += '<br><br>Aucun créneau alternatif disponible ce jour. Choisissez une autre date.';
+    document.getElementById('pause-conflict-accept').style.display = 'none';
+    _suggestedSlot   = null;
+    _suggestedBarber = null;
+  }
+
+  document.getElementById('pause-conflict-msg').innerHTML = msg;
+  document.getElementById('modal-pause-conflict').style.display = 'flex';
+}
+
+function closePauseConflictModal() {
+  document.getElementById('modal-pause-conflict').style.display = 'none';
+  // Désélectionner le créneau conflictuel
+  S.time = null;
+  document.getElementById('b3').disabled = true;
+  document.querySelectorAll('.time-slot').forEach(c => c.classList.remove('selected'));
+}
+
+function acceptSuggestedSlot() {
+  document.getElementById('modal-pause-conflict').style.display = 'none';
+  if(!_suggestedSlot) return;
+
+  // Sélectionner visuellement le créneau suggéré
+  const slots = document.querySelectorAll('.time-slot');
+  let found = false;
+  slots.forEach(el => {
+    el.classList.remove('selected');
+    if(el.textContent.trim() === _suggestedSlot) {
+      el.classList.add('selected');
+      found = true;
+      S.time = _suggestedSlot;
+      S.assignedBarber = _suggestedBarber || S.barber;
+      document.getElementById('b3').disabled = false;
+
+      // Mettre à jour le résumé avec la nouvelle heure
+      const dur = getTotalDur();
+      if(dur > 0 && S.date) {
+        const endM = toMins(_suggestedSlot) + dur;
+        const endLabel = String(Math.floor(endM/60)).padStart(2,'0')+':'+String(endM%60).padStart(2,'0');
+        const dateStr  = S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+        const sdt = document.getElementById('s-dt');
+        if(sdt) sdt.textContent = `${dateStr} de ${_suggestedSlot} à ${endLabel}`;
+      }
+    }
+  });
+
+  if(!found) {
+    // Si le bouton du slot suggéré n'est pas visible (ex: autre barbier), 
+    // forcer la sélection
+    S.time = _suggestedSlot;
+    S.assignedBarber = _suggestedBarber || S.barber;
+    document.getElementById('b3').disabled = false;
+  }
+}
+
 function resetAll(){
   S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
   document.querySelectorAll('.barber-card,.svc-item').forEach(c=>c.classList.remove('selected'));
@@ -1568,6 +1703,29 @@ function resetAll(){
   goStep(1);
 }
 </script>
+
+<!-- MODAL: CHEVAUCHEMENT PAUSE -->
+<div id="modal-pause-conflict" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  z-index:9999;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#131313;border:1px solid rgba(201,168,76,0.35);max-width:420px;width:100%;padding:2rem;border-top:4px solid #C9A84C">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:#C9A84C;margin-bottom:1rem">
+      ⚠️ Créneau non disponible
+    </div>
+    <p id="pause-conflict-msg" style="font-size:0.88rem;color:rgba(245,240,232,0.75);line-height:1.7;margin-bottom:1.5rem"></p>
+    <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
+      <button id="pause-conflict-accept" onclick="acceptSuggestedSlot()"
+        style="flex:1;background:#C9A84C;color:#080808;border:none;padding:0.8rem 1rem;
+        font-family:'Barlow',sans-serif;font-size:0.85rem;font-weight:700;letter-spacing:1px;cursor:pointer;min-width:120px">
+        Choisir ce créneau →
+      </button>
+      <button onclick="closePauseConflictModal()"
+        style="background:none;border:1px solid rgba(201,168,76,0.3);color:rgba(245,240,232,0.5);
+        padding:0.8rem 1rem;font-family:'Barlow',sans-serif;font-size:0.82rem;cursor:pointer">
+        Choisir moi-même
+      </button>
+    </div>
+  </div>
+</div>
 
 <footer style="text-align:center;padding:1.5rem;border-top:1px solid rgba(201,168,76,0.15);
   margin-top:2rem;font-size:0.72rem;letter-spacing:1px;color:rgba(245,240,232,0.25)">
