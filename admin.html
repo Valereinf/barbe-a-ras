@@ -1210,6 +1210,7 @@ const ADMIN_PWD = '040902Bs';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allResa = [], allClients = [], allWaitlist = [];
+let ADMIN_SVC_DUR = {}; // Cache durées services — chargé depuis Supabase
 let currentFilter = 'all';
 
 // ═══════════════════════════════════════════
@@ -1337,6 +1338,9 @@ function initRealtime() {
 
 async function loadAll() {
   await loadCollabs(true);
+  // Charger les durées des services depuis Supabase
+  const {data:svcData} = await sb.from('services').select('nom,duree');
+  if(svcData) svcData.forEach(s => { ADMIN_SVC_DUR[s.nom] = s.duree; });
   await Promise.all([loadReservations(), loadClients(), loadWaitlist(), loadHorairesSalon(), loadHorairesCollab(), loadExceptions()]);
   populateBarbierSelects();
   updateStats();
@@ -1646,17 +1650,11 @@ async function confirmerAbsent() {
 
 async function cancelResa(id) {
   if(!confirm('Annuler ce rendez-vous ?')) return;
-  // Récupérer le token d'annulation pour notifier le client
   const resa = allResa.find(r=>r.id===id);
-  const token = resa?.cancel_token;
-  if(token) {
-    // Notifier via cancel-booking (email + SMS + liste d'attente)
-    await fetch(`/.netlify/functions/cancel-booking?token=${token}&id=${id}`).catch(()=>{});
-  } else {
-    // Pas de token (RDV créé par admin) : annuler directement dans Supabase
-    await sb.from('reservations').update({statut:'annulé'}).eq('id',id);
-  }
-  showToast('Rendez-vous annulé','ok');
+  await sb.from('reservations').update({statut:'annulé'}).eq('id',id);
+  // Notifier le client par email/SMS
+  if(resa) await adminNotifyCancel(resa);
+  showToast('Rendez-vous annulé + client notifié ✅','ok');
   loadAll();
 }
 
@@ -1837,26 +1835,15 @@ async function openClientModal(clientId) {
 
 async function annulerResaDepuisFiche(resaId, date, heure) {
   if(!confirm(`Annuler le RDV du ${date} à ${heure} ?`)) return;
-  // Récupérer le token pour notifier le client
   const resa = allResa.find(r=>r.id===resaId);
-  const token = resa?.cancel_token;
-  if(token) {
-    // Notifier via cancel-booking (email + SMS + liste d'attente)
-    const resp = await fetch(`/.netlify/functions/cancel-booking?token=${token}&id=${resaId}`).catch(()=>null);
-    if(!resp || !resp.ok) {
-      // Fallback : annuler directement
-      await sb.from('reservations').update({statut:'annulé', cancel_token: null}).eq('id', resaId);
-    }
-  } else {
-    // Pas de token : annuler directement
-    const {error} = await sb.from('reservations')
-      .update({statut:'annulé', cancel_token: null})
-      .eq('id', resaId);
-    if(error) { showToast('Erreur annulation', 'error'); return; }
-  }
+  const {error} = await sb.from('reservations')
+    .update({statut:'annulé', cancel_token: null})
+    .eq('id', resaId);
+  if(error) { showToast('Erreur annulation', 'error'); return; }
+  // Notifier le client
+  if(resa) await adminNotifyCancel(resa);
   showToast('✅ Réservation annulée + client notifié');
   loadAll();
-  // Recharger la fiche client
   if(resa?.client_id) {
     setTimeout(()=>openClientModal(resa.client_id), 500);
   } else {
@@ -2554,16 +2541,16 @@ async function loadCalendrier(dateStr) {
 
   calGrid.innerHTML = collabs.map((c,ci) => {
     const booked = {};
-    // Construire booked[] en marquant TOUS les slots couverts par chaque RDV
+    // Construire booked[] en marquant TOUS les slots couverts par la durée du service
     (resaResps[ci]?.data||[]).forEach(r=>{
-      const startM = toM(r.heure_rdv.substring(0,5));
-      // Durée depuis SVC_DUR ou fallback 30min
-      const dur = (typeof SVC_DUR !== 'undefined' && SVC_DUR[r.service]) || 30;
-      // Marquer le slot de début avec le RDV complet
-      booked[r.heure_rdv.substring(0,5)] = r;
-      // Marquer les slots suivants couverts par la durée (sans le RDV, juste bloqués)
+      const startKey = r.heure_rdv.substring(0,5);
+      const startM = toM(startKey);
+      const dur = ADMIN_SVC_DUR[r.service] || 30;
+      // Slot de début = le RDV complet
+      booked[startKey] = r;
+      // Slots suivants couverts = marqués comme bloqués
       for(let m = startM + slotStep; m < startM + dur; m += slotStep) {
-        const t = (Math.floor(m/60)+'').padStart(2,'0') + ':' + (m%60+'').padStart(2,'0');
+        const t = (Math.floor(m/60)+'').padStart(2,'0') + ':' + ((m%60)+'').padStart(2,'0');
         if(!booked[t]) booked[t] = { _blocked: true, _parentResa: r };
       }
     });
@@ -2586,10 +2573,11 @@ async function loadCalendrier(dateStr) {
           const tM = toM(t);
           const inPause = pauses.find(p=>tM>=toM(p.debut)&&tM<toM(p.fin));
           if(r && r._blocked) {
-            // Slot occupé par un RDV en cours (ex: 09:15 occupé par RDV de 09:00 pendant 30min)
-            return `<div class="cal-slot booked" style="opacity:0.45;cursor:default" title="Occupé par le RDV de ${r._parentResa?.clients?.prenom||''} (${r._parentResa?.heure_rdv?.substring(0,5)||''})">
+            // Slot occupé par suite d'un RDV en cours
+            return `<div class="cal-slot booked" style="opacity:0.4;cursor:default;background:rgba(201,168,76,0.04)"
+              title="En cours — ${r._parentResa?.service||''} (depuis ${r._parentResa?.heure_rdv?.substring(0,5)||''})">
               <span class="slot-time">${t}</span>
-              <div class="slot-info"><div class="slot-svc" style="color:var(--dim2);font-size:0.72rem">⏱ En cours</div></div>
+              <div class="slot-info"><div class="slot-svc" style="color:var(--dim2);font-size:0.7rem">⏱ En cours</div></div>
             </div>`;
           } else if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
@@ -2697,11 +2685,7 @@ async function saveResaEdit() {
     const resa = allResa.find(r=>r.id===id);
     const client = resa?.clients;
     if(client) {
-      await fetch('/.netlify/functions/cancel-booking', {
-        method:'GET',
-        headers:{}
-      }).catch(()=>{});
-      // Notify via dedicated function
+      // Notify via dedicated function (SMS + email client)
       await notifyResaModif(id, client, date, heure, barbier, service);
     }
   }
@@ -2709,6 +2693,36 @@ async function saveResaEdit() {
   showToast(notify ? 'RDV modifié + client notifié ✅' : 'RDV modifié ✅ (sans notification)','ok');
   closeModal('modal-edit-resa');
   loadAll();
+}
+
+// Notification d'annulation depuis l'admin (email + SMS au client)
+async function adminNotifyCancel(resa) {
+  try {
+    const client = resa.clients || {};
+    const tel   = client.telephone;
+    const email = client.email;
+    const prenom = client.prenom || 'Client';
+    const nom    = client.nom || '';
+    const dateStr = resa.date_rdv;
+    const heure  = resa.heure_rdv?.substring(0,5);
+
+    // SMS via send-confirmation (type admin-cancel)
+    await fetch('/.netlify/functions/send-confirmation', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        type: 'admin-cancel',
+        prenom, nom, email, tel,
+        barbier: resa.barbier,
+        service: resa.service,
+        prix: resa.prix,
+        date: dateStr,
+        heure
+      })
+    }).catch(()=>{});
+  } catch(e) {
+    console.error('adminNotifyCancel error:', e);
+  }
 }
 
 async function notifyResaModif(id, client, newDate, newHeure, barbier, service) {
