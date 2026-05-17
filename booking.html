@@ -460,6 +460,72 @@ function localToday() {
 let S={step:'1',barber:null,assignedBarber:null,services:[],date:null,time:null,month:new Date().getMonth(),year:new Date().getFullYear(),bookingId:null,isAddOn:false,existingResaId:null,existingResaServices:null,existingResaPrice:0,savedClient:null};
 let _bookingCollabs=[];
 
+// ── AUTO-POPULATE depuis compte client connecté ──
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.user) return; // Pas connecté → formulaire vide normal
+
+    // Client connecté → récupérer ses infos depuis la table clients
+    const { data: client } = await sb.from('clients')
+      .select('prenom, nom, telephone, email, auth_user_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!client) return;
+
+    // Pré-remplir savedClient dans l'état S
+    S.savedClient = {
+      prenom: client.prenom || '',
+      nom:    client.nom    || '',
+      tel:    client.telephone || '',
+      email:  client.email  || session.user.email || '',
+      note:   ''
+    };
+
+    // Pré-remplir les champs du formulaire dès que le DOM est prêt
+    const fill = () => {
+      const fields = {
+        'f-prenom': S.savedClient.prenom,
+        'f-nom':    S.savedClient.nom,
+        'f-tel':    S.savedClient.tel,
+        'f-email':  S.savedClient.email,
+      };
+      Object.entries(fields).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el && val) {
+          el.value = val;
+          el.dispatchEvent(new Event('input')); // Déclencher la validation
+        }
+      });
+      // Afficher un badge "Connecté" dans le formulaire
+      const prenomEl = document.getElementById('f-prenom');
+      if (prenomEl && !document.getElementById('client-logged-badge')) {
+        const badge = document.createElement('div');
+        badge.id = 'client-logged-badge';
+        badge.style.cssText = 'font-size:0.72rem;color:var(--green,#27ae60);margin-bottom:0.8rem;letter-spacing:1px;display:flex;align-items:center;gap:0.4rem';
+        badge.innerHTML = '✅ Connecté — vos informations sont pré-remplies. <a href="/mon-compte.html" style="color:var(--gold,#C9A84C);text-decoration:none">Mon compte →</a>';
+        const formStep = prenomEl.closest('.booking-form') || prenomEl.closest('section') || prenomEl.parentElement?.parentElement;
+        if (formStep) formStep.insertBefore(badge, formStep.firstChild);
+      }
+    };
+
+    // Si l'étape 4 (infos) est déjà visible, remplir maintenant
+    if (document.getElementById('f-prenom')) fill();
+    // Sinon, observer quand elle devient visible
+    const observer = new MutationObserver(() => {
+      if (document.getElementById('f-prenom')?.offsetParent !== null) {
+        fill();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+
+  } catch (e) {
+    console.log('[Auto-populate] non connecté ou erreur:', e.message);
+  }
+})();
+
 async function loadBookingCollabs(){
   if(_bookingCollabs.length) return _bookingCollabs;
   try {
