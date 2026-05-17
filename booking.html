@@ -786,8 +786,9 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
     for(const b of allBusy) {
       // Réservations existantes : bloquer si overlap complet
       if(b.isPause) {
-        // Pause : bloquer uniquement si le créneau COMMENCE pendant la pause
-        if(slotStart >= b.start && slotStart < b.end) return false;
+        // Pause : bloquer si le service chevauche la pause
+        // (commence avant la fin de la pause ET se termine après le début)
+        if(slotStart < b.end && slotEnd > b.start) return false;
       } else {
         // Réservation : overlap standard
         if(slotStart < b.end && slotEnd > b.start) return false;
@@ -798,6 +799,16 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
   });
 }
 
+
+// Trouve le prochain slot disponible après un slot donné
+function getNextAvailableSlot(dt, busyIntervals, requestedDur, blockedSlots=[], barber=null, afterSlot=null) {
+  const available = getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots, barber);
+  if(!afterSlot) return available[0] || null;
+  const afterM = toMins(afterSlot);
+  // Chercher le premier slot disponible après afterSlot
+  const next = available.find(s => toMins(s) > afterM);
+  return next || available[0] || null;
+}
 
 async function renderCal(){
   await ensureHoraires();
@@ -999,8 +1010,21 @@ function getBlockedSlotsFromIndi(indis, barbier, dt) {
 
 function selTime(el,t,barberAssigned){
   document.querySelectorAll('.time-slot').forEach(c=>c.classList.remove('selected'));
-  el.classList.add('selected');S.time=t;S.assignedBarber=barberAssigned||S.barber;
-  document.getElementById('b3').disabled=false;
+  el.classList.add('selected');
+  S.time = t;
+  S.assignedBarber = barberAssigned || S.barber;
+  document.getElementById('b3').disabled = false;
+
+  // Afficher heure de début ET de fin dans le résumé
+  const dur = getTotalDur();
+  if(dur > 0 && S.date) {
+    const startM = toMins(t);
+    const endM = startM + dur;
+    const endLabel = String(Math.floor(endM/60)).padStart(2,'0') + ':' + String(endM%60).padStart(2,'0');
+    const dateStr = S.date.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+    const sdt = document.getElementById('s-dt');
+    if(sdt) sdt.textContent = `${dateStr} de ${t} à ${endLabel}`;
+  }
 }
 
 function updSum(){
