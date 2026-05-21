@@ -557,6 +557,10 @@ async function loadBookingCollabs(){
 }
 
 function goStep(n){
+  // Gérer le polling: démarrer à l'étape 3, arrêter sinon
+  if(n === 3) startSlotPolling();
+  else stopSlotPolling();
+
   const screens=['sc1','sc2','sc3','sc4','sc5','sc-waitlist','sc-wl-conf'];
   screens.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   document.getElementById('sc'+n).style.display='block';
@@ -1183,6 +1187,31 @@ async function submitBooking(){
     allSvcNames = newSvcNames;
     allPrice = newPrice;
     allPriceStr = allPrice.toFixed(2)+'$';
+
+    // ── VÉRIFICATION ANTI-DOUBLE RÉSERVATION ──
+    // Vérifier en temps réel que le slot est encore libre juste avant d'insérer
+    const {data:slotCheck} = await sb.from('reservations')
+      .select('id')
+      .eq('date_rdv', dateStr)
+      .eq('heure_rdv', S.time)
+      .eq('barbier', finalBarber)
+      .eq('statut', 'confirmé')
+      .maybeSingle();
+
+    if(slotCheck) {
+      hideOverlay();
+      // Le slot vient d'être pris — recharger les créneaux et avertir
+      showToast('⚠ Ce créneau vient d\'être réservé. Veuillez choisir un autre horaire.', 'error');
+      // Recharger silencieusement les créneaux pour la date sélectionnée
+      const calDay = document.querySelector('.cal-day.selected');
+      if(calDay && S.date) selDay(S.date.getDate(), S.date, calDay);
+      // Ramener à l'étape 3 (choix du créneau)
+      S.time = null;
+      S.step = '3';
+      showStep('3');
+      return;
+    }
+
     const {data:resa,error:re}=await sb.from('reservations').insert({
       client_id:clientId,barbier:finalBarber,service:allSvcNames,prix:allPriceStr,
       date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note
@@ -1593,21 +1622,23 @@ function initBookingRealtime() {
       console.log('[Realtime] collaborateurs mis à jour');
     })
     .on('postgres_changes', {event:'*', schema:'public', table:'reservations'}, payload => {
-      // Si une date est sélectionnée et qu'une résa change sur ce jour → recharger les créneaux
-      if(S.date) {
-        const changedDate = payload.new?.date_rdv || payload.old?.date_rdv;
-        const selectedDate = localDateStr(S.date);
-        if(changedDate === selectedDate) {
-          console.log('[Realtime] réservation changée sur la date sélectionnée — rechargement créneaux');
-          // Revider le cache et recharger silencieusement
-          _horairesSalon = null;
-          _horairesCollab = null;
-          _horairesExceptions = {};
-          const calDay = document.querySelector('.cal-day.selected');
-          if(calDay && S.date) {
-            const d = S.date.getDate();
-            selDay(d, S.date, calDay);
-          }
+      if(!S.date) return;
+      const changedDate = payload.new?.date_rdv || payload.old?.date_rdv;
+      const selectedDate = localDateStr(S.date);
+
+      // Recharger si : la date correspond OU si le payload est incomplet (Supabase ne retourne
+      // pas toujours date_rdv dans le payload → on recharge par sécurité si étape 3 active)
+      const shouldReload = changedDate === selectedDate
+        || (!changedDate && S.step === '3');
+
+      if(shouldReload) {
+        console.log('[Realtime] réservation changée — rechargement créneaux immédiat');
+        _horairesSalon = null;
+        _horairesCollab = null;
+        _horairesExceptions = {};
+        const calDay = document.querySelector('.cal-day.selected');
+        if(calDay && S.date) {
+          selDay(S.date.getDate(), S.date, calDay);
         }
       }
     })
@@ -1617,6 +1648,27 @@ function initBookingRealtime() {
 }
 
 initBookingRealtime();
+
+// ── POLLING FALLBACK — rafraîchit les créneaux toutes les 15s à l'étape 3 ──
+// Complète le Realtime en cas de délai ou de déconnexion
+let _pollingTimer = null;
+
+function startSlotPolling() {
+  stopSlotPolling();
+  _pollingTimer = setInterval(() => {
+    if(S.step === '3' && S.date) {
+      const calDay = document.querySelector('.cal-day.selected');
+      if(calDay) {
+        console.log('[Polling] Rafraîchissement créneaux...');
+        selDay(S.date.getDate(), S.date, calDay);
+      }
+    }
+  }, 15000); // 15 secondes
+}
+
+function stopSlotPolling() {
+  if(_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null; }
+}
 
 let _suggestedSlot = null;
 let _suggestedBarber = null;
