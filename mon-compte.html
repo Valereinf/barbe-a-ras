@@ -310,12 +310,14 @@ async function init() {
   await Promise.all([loadRDV(), loadAvis()]);
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
+  initClientRealtime(); // Écouter les changements en temps réel
 }
 
 async function loadRDV() {
   const today = new Date().toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
   const {data:resas} = await sb.from('reservations').select('*')
     .eq('client_id', clientData.id).order('date_rdv',{ascending:false});
+  _clientResas = resas || []; // Cache pour cancelDirectly et openModifyModal
   const upcoming = (resas||[]).filter(r=>r.date_rdv>=today&&r.statut==='confirmé');
   const history  = (resas||[]).filter(r=>r.date_rdv<today||r.statut==='annulé');
 
@@ -331,10 +333,18 @@ async function loadRDV() {
             <span>🕐 ${r.heure_rdv?.substring(0,5)}</span><span>✂ ${r.barbier}</span>
             <span>💈 ${r.service}</span><span style="color:var(--gold)">💰 ${r.prix}</span>
           </div>
-          ${r.cancel_token?`<div class="rdv-actions">
-            <a href="/modify?token=${r.cancel_token}&id=${r.id}" class="btn-sm-gold">✏️ Modifier</a>
-            ${canCancel?`<a href="/cancel?token=${r.cancel_token}&id=${r.id}" class="btn-sm-red">✕ Annuler</a>`:''}
-          </div>`:''}
+          <div class="rdv-actions">
+            ${r.cancel_token
+              ? `<a href="/modify?token=${r.cancel_token}&id=${r.id}" class="btn-sm-gold">✏️ Modifier</a>`
+              : `<button class="btn-sm-gold" onclick="openModifyModal('${r.id}')">✏️ Modifier</button>`
+            }
+            ${canCancel
+              ? (r.cancel_token
+                  ? `<a href="/cancel?token=${r.cancel_token}&id=${r.id}" class="btn-sm-red">✕ Annuler</a>`
+                  : `<button class="btn-sm-red" onclick="cancelDirectly('${r.id}')">✕ Annuler</button>`)
+              : `<span style="font-size:0.72rem;color:var(--dim2)">⏰ Annulation &lt; 3h — appeler</span>`
+            }
+          </div>
         </div>`;
       }).join('');
 
@@ -361,6 +371,134 @@ async function loadRDV() {
           ${dejaAvis ? '<div style="font-size:0.72rem;color:var(--gold);margin-top:0.5rem">✅ Avis donné</div>' : ''}
         </div>`;
       }).join('');
+}
+
+// ══════════════════════════════════════════════
+// ANNULATION DIRECTE (sans cancel_token)
+// ══════════════════════════════════════════════
+async function cancelDirectly(resaId) {
+  if(!confirm('Annuler ce rendez-vous ?')) return;
+
+  // Vérifier délai 3h
+  const resa = _clientResas?.find(r => r.id === resaId);
+  if(resa) {
+    const diff = (new Date(resa.date_rdv+'T'+resa.heure_rdv+'-04:00') - new Date()) / (1000*60*60);
+    if(diff < 3) {
+      alert('Annulation impossible \u2014 moins de 3h avant le rendez-vous. Appelez le (418) 612-2007.');
+      return;
+    }
+  }
+
+  const {error} = await sb.from('reservations')
+    .update({statut: 'annulé'})
+    .eq('id', resaId)
+    .eq('client_id', clientData.id); // Sécurité: seulement ses propres RDV
+
+  if(error) { alert('Erreur lors de l\'annulation. Réessayez.'); return; }
+
+  showToast('Rendez-vous annulé ✅');
+  await loadRDV(); // Recharger immédiatement
+}
+
+// ══════════════════════════════════════════════
+// MODIFICATION DIRECTE (sans cancel_token)
+// ══════════════════════════════════════════════
+let _modifyResaId = null;
+let _clientResas  = null; // Cache des réservations du client
+
+function openModifyModal(resaId) {
+  _modifyResaId = resaId;
+  const resa = _clientResas?.find(r => r.id === resaId);
+  if(!resa) return;
+
+  // Créer un modal de modification inline si pas déjà présent
+  let modal = document.getElementById('modal-modify-client');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-modify-client';
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem';
+    modal.innerHTML = `
+      <div style="background:#131313;border:1px solid rgba(201,168,76,0.35);max-width:400px;width:100%;padding:2rem;border-top:4px solid #C9A84C">
+        <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:#C9A84C;margin-bottom:1.5rem">✏️ MODIFIER LE RENDEZ-VOUS</h3>
+        <div style="margin-bottom:1rem">
+          <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:rgba(245,240,232,0.35);display:block;margin-bottom:0.4rem">Nouvelle date</label>
+          <input type="date" id="modify-new-date" style="width:100%;background:rgba(245,240,232,0.04);border:1px solid rgba(201,168,76,0.35);color:#f5f0e8;padding:0.7rem;font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none">
+        </div>
+        <div style="margin-bottom:1.5rem">
+          <label style="font-size:0.68rem;letter-spacing:2px;text-transform:uppercase;color:rgba(245,240,232,0.35);display:block;margin-bottom:0.4rem">Nouvelle heure</label>
+          <input type="time" id="modify-new-time" step="900" style="width:100%;background:rgba(245,240,232,0.04);border:1px solid rgba(201,168,76,0.35);color:#f5f0e8;padding:0.7rem;font-family:'Barlow',sans-serif;font-size:0.9rem;outline:none">
+        </div>
+        <div style="display:flex;gap:0.8rem">
+          <button onclick="saveModifyDirect()" style="flex:1;background:#C9A84C;color:#080808;border:none;padding:0.8rem;font-family:'Barlow',sans-serif;font-size:0.85rem;font-weight:700;letter-spacing:1px;cursor:pointer">Sauvegarder</button>
+          <button onclick="document.getElementById('modal-modify-client').style.display='none'" style="background:none;border:1px solid rgba(201,168,76,0.3);color:rgba(245,240,232,0.5);padding:0.8rem 1.2rem;font-family:'Barlow',sans-serif;cursor:pointer">Annuler</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+
+  // Pré-remplir avec la date/heure actuelle
+  if(resa.date_rdv) document.getElementById('modify-new-date').value = resa.date_rdv;
+  if(resa.heure_rdv) document.getElementById('modify-new-time').value = resa.heure_rdv.substring(0,5);
+  modal.style.display = 'flex';
+}
+
+async function saveModifyDirect() {
+  const newDate = document.getElementById('modify-new-date').value;
+  const newTime = document.getElementById('modify-new-time').value;
+  if(!newDate || !newTime) { alert('Date et heure requises.'); return; }
+
+  // Vérifier délai 3h sur l'ancien RDV
+  const resa = _clientResas?.find(r => r.id === _modifyResaId);
+  if(resa) {
+    const diff = (new Date(resa.date_rdv+'T'+resa.heure_rdv+'-04:00') - new Date()) / (1000*60*60);
+    if(diff < 3) {
+      alert('Modification impossible \u2014 moins de 3h avant le rendez-vous. Appelez le (418) 612-2007.');
+      return;
+    }
+  }
+
+  // Vérifier que le nouveau slot est libre
+  const {data:existing} = await sb.from('reservations')
+    .select('id')
+    .eq('date_rdv', newDate)
+    .eq('heure_rdv', newTime+':00')
+    .eq('barbier', resa?.barbier || '')
+    .eq('statut', 'confirmé')
+    .neq('id', _modifyResaId) // Exclure la résa courante
+    .maybeSingle();
+
+  if(existing) { alert('Ce créneau est déjà pris. Choisissez un autre horaire.'); return; }
+
+  const {error} = await sb.from('reservations')
+    .update({date_rdv: newDate, heure_rdv: newTime+':00', rappel_envoye: false})
+    .eq('id', _modifyResaId)
+    .eq('client_id', clientData.id);
+
+  if(error) { alert('Erreur lors de la modification. Réessayez.'); return; }
+
+  document.getElementById('modal-modify-client').style.display = 'none';
+  showToast('Rendez-vous modifié ✅');
+  await loadRDV(); // Recharger immédiatement
+}
+
+// ══════════════════════════════════════════════
+// REALTIME — mise à jour automatique des RDV
+// ══════════════════════════════════════════════
+function initClientRealtime() {
+  if(!clientData?.id) return;
+  sb.channel('client-rdv-sync')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'reservations',
+      filter: `client_id=eq.${clientData.id}`
+    }, () => {
+      console.log('[Realtime client] réservation changée — rechargement');
+      loadRDV();
+    })
+    .subscribe(status => {
+      console.log('[Realtime client] status:', status);
+    });
 }
 
 async function loadAvis() {
