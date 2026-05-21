@@ -865,7 +865,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
         <div style="font-size:0.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:0.6rem">📱 Notification client</div>
         <p style="font-size:0.82rem;color:var(--dim2);margin-bottom:0.8rem">Après la sauvegarde, voulez-vous notifier le client de cette modification ?</p>
         <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;font-size:0.85rem;color:var(--dim)">
-          <input type="checkbox" id="edit-resa-notify" style="accent-color:var(--gold);width:16px;height:16px">
+          <input type="checkbox" id="edit-resa-notify" checked style="accent-color:var(--gold);width:16px;height:16px">
           Envoyer une notification au client (SMS/courriel)
         </label>
       </div>
@@ -2675,6 +2675,10 @@ async function saveResaEdit() {
   const notify = document.getElementById('edit-resa-notify').checked;
   if(!date||!heure){showToast('Date et heure requises','err');return;}
 
+  // Sauvegarder l'ancienne date AVANT la modification (pour rafraîchir les 2 jours)
+  const oldResa = allResa.find(r=>r.id===id);
+  const oldDate = oldResa?.date_rdv;
+
   // Save to Supabase
   await sb.from('reservations').update({
     barbier, service, prix, date_rdv:date, heure_rdv:heure+':00', rappel_envoye:false
@@ -2683,16 +2687,47 @@ async function saveResaEdit() {
   // Send notification if checked
   if(notify) {
     const resa = allResa.find(r=>r.id===id);
-    const client = resa?.clients;
-    if(client) {
-      // Notify via dedicated function (SMS + email client)
+    let client = resa?.clients;
+
+    // Si clients pas chargés dans allResa → chercher dans allClients ou Supabase
+    if((!client?.telephone && !client?.email) && resa?.client_id) {
+      client = allClients.find(c => c.id === resa.client_id);
+      if(!client) {
+        const {data} = await sb.from('clients')
+          .select('prenom,nom,telephone,email')
+          .eq('id', resa.client_id).single();
+        client = data;
+      }
+    }
+
+    if(client?.telephone || client?.email) {
       await notifyResaModif(id, client, date, heure, barbier, service);
+    } else {
+      console.warn('[saveResaEdit] Client introuvable pour notification');
+      showToast('RDV modifié ✅ (client sans coordonnées — pas de notif)', 'ok');
     }
   }
 
   showToast(notify ? 'RDV modifié + client notifié ✅' : 'RDV modifié ✅ (sans notification)','ok');
   closeModal('modal-edit-resa');
-  loadAll();
+
+  // Forcer rechargement immédiat des réservations
+  await loadReservations();
+  updateStats();
+  loadTodayList();
+
+  // Recharger le calendrier sur l'ancienne ET la nouvelle date
+  const picker = document.getElementById('cal-date-picker');
+  if(picker) {
+    if(oldDate) {
+      await loadCalendrier(oldDate);
+    }
+    if(date && date !== oldDate) {
+      await loadCalendrier(date);
+    }
+    // Remettre la date courante du picker
+    if(picker.value) await loadCalendrier(picker.value);
+  }
 }
 
 // Notification d'annulation depuis l'admin (email + SMS au client)
@@ -2727,18 +2762,26 @@ async function adminNotifyCancel(resa) {
 
 async function notifyResaModif(id, client, newDate, newHeure, barbier, service) {
   try {
-    await fetch('/.netlify/functions/notify-modif', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+    console.log('[notifyResaModif] Envoi notification modification:', {
+      prenom: client?.prenom, tel: client?.telephone, email: client?.email,
+      newDate, newHeure, barbier, service
+    });
+    const resp = await fetch('/.netlify/functions/notify-modif', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        tel: client.telephone,
-        email: client.email,
-        prenom: client.prenom,
+        tel:    client.telephone || '',
+        email:  client.email    || '',
+        prenom: client.prenom   || 'Client',
         newDate, newHeure, barbier, service,
         reservationId: id
       })
     });
-  } catch(e) {}
+    const result = await resp.json().catch(() => ({}));
+    console.log('[notifyResaModif] Résultat:', result);
+  } catch(e) {
+    console.error('[notifyResaModif] Erreur:', e);
+  }
 }
 
 // ═══════════════════════════════════════════
