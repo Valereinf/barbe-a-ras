@@ -116,6 +116,79 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ ok: true, type: 'admin-cancel-sent' }) };
   }
 
+  // ── CAS ADMIN : modification par Barbara ──
+  if (data.type === 'admin-modify') {
+    const { prenom, nom, email, tel, barbier, service, date, heure } = data;
+    const TWILIO_SID   = process.env.TWILIO_SID;
+    const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
+    const TWILIO_PHONE = process.env.TWILIO_PHONE;
+
+    // SMS au client
+    if (tel && TWILIO_SID && TWILIO_TOKEN && TWILIO_PHONE) {
+      const telClean = tel.replace(/\D/g,'').slice(-10);
+      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          From: TWILIO_PHONE,
+          To: '+1' + telClean,
+          Body: `Bonjour ${prenom}, votre RDV chez Barbe-A-Ras a ete modifie: ${date} a ${heure} avec ${barbier}. Questions: (418) 612-2007`
+        }).toString()
+      }).catch(()=>{});
+    }
+
+    // Email au client
+    if (email && RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+          to: [email],
+          subject: `🔄 Rendez-vous modifié — ${date} à ${heure} | Barbe-À-Ras`,
+          html: `
+            <div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #C9A84C">
+              <h2 style="color:#C9A84C;letter-spacing:2px">🔄 RENDEZ-VOUS MODIFIÉ</h2>
+              <p>Bonjour <strong>${prenom}</strong>,</p>
+              <p>Votre rendez-vous chez <strong style="color:#C9A84C">Barbe-À-Ras</strong> a été modifié :</p>
+              <div style="border:1px solid rgba(201,168,76,0.3);padding:20px;margin:20px 0">
+                <p style="margin:5px 0"><strong style="color:#C9A84C">📅 Nouvelle date :</strong> ${date}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">🕐 Nouvelle heure :</strong> ${heure}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">✂ Service :</strong> ${service}</p>
+                <p style="margin:5px 0"><strong style="color:#C9A84C">👤 Barbier·ère :</strong> ${barbier}</p>
+              </div>
+              <p style="font-size:13px;color:rgba(245,240,232,0.6)">Questions ? Appelez le <a href="tel:4186122007" style="color:#C9A84C">(418) 612-2007</a></p>
+              <a href="https://barbe-a-ras.ca/mon-compte.html" style="display:inline-block;background:#C9A84C;color:#080808;padding:10px 25px;text-decoration:none;font-weight:700;margin-top:15px">Voir mon compte →</a>
+              <p style="margin-top:20px;font-size:12px;color:rgba(245,240,232,0.3)">Barbe-À-Ras · 749 Rue d'Alma, Local 101, Chicoutimi</p>
+            </div>`
+        })
+      }).catch(()=>{});
+    }
+
+    // Notifier Barbara
+    if (RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Barbe-À-Ras <reservations@barbe-a-ras.ca>',
+          to: ['barbearas.pro@gmail.com'],
+          subject: `🔄 Modification confirmée — ${prenom} ${nom} · ${date} à ${heure}`,
+          html: `<div style="font-family:Arial,sans-serif;background:#080808;color:#f5f0e8;padding:30px;max-width:500px;border-top:4px solid #C9A84C">
+            <h2 style="color:#C9A84C">🔄 MODIFICATION EFFECTUÉE</h2>
+            <p>Client <strong>${prenom} ${nom}</strong> — RDV modifié vers <strong>${date}</strong> à <strong>${heure}</strong> (${service} avec ${barbier}).</p>
+            <a href="https://barbe-a-ras.ca/admin" style="display:inline-block;background:#C9A84C;color:#080808;padding:10px 25px;text-decoration:none;font-weight:700;margin-top:10px">Voir le panel admin</a>
+          </div>`
+        })
+      }).catch(()=>{});
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ ok: true, type: 'admin-modify-sent' }) };
+  }
+
   // ── CAS NORMAL : confirmation de réservation ──
   const { reservationId, prenom, email, tel, barbier, service, prix, date, heure, note } = data;
 
