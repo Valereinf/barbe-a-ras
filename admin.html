@@ -2541,6 +2541,16 @@ async function loadCalendrier(dateStr) {
   const allSlots=[];
   for(let m=startH*60;m<endH*60;m+=slotStep) allSlots.push((Math.floor(m/60)+'').padStart(2,'0')+':'+(m%60+'').padStart(2,'0'));
 
+  // Calculer l'heure actuelle en minutes si on affiche aujourd'hui
+  const todayAdminStr = new Date().toLocaleDateString('en-CA',{timeZone:'America/Toronto'});
+  const isAdminToday = (dateStr === todayAdminStr);
+  const adminNowMins = (() => {
+    if(!isAdminToday) return -1;
+    const now = new Date();
+    const parts = now.toLocaleTimeString('en-CA',{timeZone:'America/Toronto',hour:'2-digit',minute:'2-digit',hour12:false}).split(':');
+    return parseInt(parts[0])*60 + parseInt(parts[1]);
+  })();
+
   calGrid.innerHTML = collabs.map((c,ci) => {
     const booked = {};
     // Construire booked[] en marquant TOUS les slots couverts par la durée du service
@@ -2610,6 +2620,13 @@ async function loadCalendrier(dateStr) {
               </div>
               <span class="slot-badge">☕</span></div>`;
           } else {
+            // Créneau passé aujourd'hui → grisé, non cliquable
+            if(adminNowMins >= 0 && toM(t) <= adminNowMins) {
+              return `<div class="cal-slot" style="opacity:0.22;cursor:default">
+                <span class="slot-time">${t}</span>
+                <div class="slot-info"><div class="slot-svc" style="color:var(--dim2);font-size:0.72rem">— Passé</div></div>
+              </div>`;
+            }
             return `<div class="cal-slot free" onclick="openNewResaModal('${dateStr}','${t}','${c.nom}')">
               <span class="slot-time">${t}</span>
               <div class="slot-info"><div class="slot-svc" style="color:var(--green)">Disponible — cliquer pour RDV</div></div>
