@@ -785,10 +785,25 @@ function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], bar
   }
   const allBusy = [...busyIntervals, ...pauseIntervals];
 
+  // Heure actuelle en minutes si on est aujourd'hui
+  const nowMins = (() => {
+    const todayStr = localToday();
+    const dtStr = dt instanceof Date
+      ? dt.toLocaleDateString('en-CA',{timeZone:'America/Toronto'})
+      : dt;
+    if(dtStr !== todayStr) return -1; // Pas aujourd'hui → aucun filtre
+    const now = new Date();
+    const h = parseInt(now.toLocaleTimeString('en-CA',{timeZone:'America/Toronto',hour:'2-digit',hour12:false}));
+    const m = parseInt(now.toLocaleTimeString('en-CA',{timeZone:'America/Toronto',minute:'2-digit'}));
+    return h * 60 + m;
+  })();
+
   return allSlots.filter(slot => {
     const slotStart = toMins(slot);
     const slotEnd = slotStart + requestedDur;
     if(slotEnd > dayEnd) return false;
+    // Bloquer les créneaux déjà passés (y compris le créneau en cours)
+    if(nowMins >= 0 && slotStart <= nowMins) return false;
     for(const b of allBusy) {
       // Réservations existantes : bloquer si overlap complet
       if(b.isPause) {
