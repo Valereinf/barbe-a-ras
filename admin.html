@@ -218,8 +218,8 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
 .cal-slot .slot-time{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;color:var(--dim2);min-width:50px}
 .cal-slot.booked .slot-time{color:var(--gold)}
 .cal-slot .slot-info{flex:1;margin:0 0.8rem;font-size:0.82rem}
-.cal-slot .slot-name{color:var(--white);font-weight:500}
-.cal-slot .slot-svc{color:var(--dim2);font-size:0.75rem;margin-top:1px}
+.cal-slot .slot-name{color:var(--white);font-weight:500;white-space:normal;word-break:break-word}
+.cal-slot .slot-svc{color:var(--dim2);font-size:0.75rem;margin-top:1px;white-space:normal;word-break:break-word;line-height:1.3}
 .cal-slot .slot-badge{font-size:0.6rem;letter-spacing:1px;padding:0.1rem 0.4rem;border-radius:2px}
 .cal-slot.free .slot-badge{background:rgba(39,174,96,0.15);color:var(--green);border:1px solid rgba(39,174,96,0.3)}
 .cal-slot.booked .slot-badge{background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid var(--gold4)}
@@ -2510,7 +2510,9 @@ async function loadCalendrier(dateStr) {
   if(!calGrid) return;
 
   // Colonne par collaborateur
-  calGrid.style.gridTemplateColumns = collabs.map(()=>'1fr').join(' ');
+  // Colonnes suffisamment larges pour afficher les noms complets
+  const colWidth = collabs.length <= 2 ? 'minmax(380px,1fr)' : 'minmax(300px,1fr)';
+  calGrid.style.gridTemplateColumns = collabs.map(()=>colWidth).join(' ');
 
   // Charger réservations, indisponibilités ET horaires collaborateurs (pour les pauses)
   const [indiResp, horairesResp, exceptionsResp, ...resaResps] = await Promise.all([
@@ -2701,10 +2703,31 @@ async function saveResaEdit() {
     }
 
     if(client?.telephone || client?.email) {
-      await notifyResaModif(id, client, date, heure, barbier, service);
+      // Même approche que adminNotifyCancel: send-confirmation avec type dédié
+      const dateFormatted = new Date(date+'T12:00:00')
+        .toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      try {
+        const resp = await fetch('/.netlify/functions/send-confirmation', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            type:    'admin-modify',
+            prenom:  client.prenom  || 'Client',
+            nom:     client.nom     || '',
+            email:   client.email   || '',
+            tel:     client.telephone || '',
+            barbier, service,
+            date:    dateFormatted,
+            heure
+          })
+        });
+        const result = await resp.json().catch(()=>({}));
+        console.log('[saveResaEdit] Notification envoyée:', result);
+      } catch(e) {
+        console.error('[saveResaEdit] Erreur notification:', e);
+      }
     } else {
       console.warn('[saveResaEdit] Client introuvable pour notification');
-      showToast('RDV modifié ✅ (client sans coordonnées — pas de notif)', 'ok');
     }
   }
 
