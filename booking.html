@@ -756,7 +756,7 @@ function getBusyIntervals(reservations, serviceDurMap) {
   });
 }
 
-// Service duration map
+// Service duration map — chargé depuis Supabase au démarrage
 const SVC_DUR = {
   'Coupe de cheveux adulte': 30,
   'Coupe enfant (0-15 ans)': 30,
@@ -769,6 +769,20 @@ const SVC_DUR = {
   'Coupe adulte hors heures': 30,
   'Coupe + barbe lame hors heures': 60,
 };
+let _svcDurLoaded = false;
+
+// Charger les durées depuis Supabase — DOIT être appelé avant tout calcul de slots
+async function ensureSvcDurLoaded() {
+  if(_svcDurLoaded) return;
+  try {
+    const {data} = await sb.from('services').select('nom,duree').eq('actif',true);
+    if(data) data.forEach(s => { SVC_DUR[s.nom] = s.duree; });
+    _svcDurLoaded = true;
+    console.log('[SVC_DUR] Durées chargées:', SVC_DUR);
+  } catch(e) {
+    console.error('[SVC_DUR] Erreur chargement durées:', e);
+  }
+}
 
 // Get available slots given busy intervals and requested duration
 function getAvailableSlots(dt, busyIntervals, requestedDur, blockedSlots=[], barber=null) {
@@ -905,6 +919,8 @@ async function selDay(d,dt,el){
   el.classList.add('selected');S.date=dt;S.time=null;
   document.getElementById('b3').disabled=true;
   document.getElementById('waitlist-banner').style.display='none';
+  // GARANTIR que les durées sont chargées avant tout calcul de disponibilité
+  await ensureSvcDurLoaded();
   document.getElementById('time-sec').style.display='none';
   showOverlay('Vérification des disponibilités...');
   const dateStr=localDateStr(dt);
@@ -1192,7 +1208,7 @@ async function submitBooking(){
       service: allSvcNames,
       prix: allPriceStr,
       date_rdv: dateStr,
-      heure_rdv: S.time,
+      heure_rdv: S.time.length===5?S.time+':00':S.time,
       rappel_envoye: false
     }).eq('id', S.existingResaId);
     if(pe){hideOverlay();showToast('Erreur lors de la mise à jour. Réessayez.','error');return;}
@@ -1205,10 +1221,12 @@ async function submitBooking(){
 
     // ── VÉRIFICATION ANTI-DOUBLE RÉSERVATION ──
     // Vérifier en temps réel que le slot est encore libre juste avant d'insérer
+    // Vérifier avec les deux formats possibles (TIME Postgres = '09:00:00', input = '09:00')
+    const heureCheck = S.time.length === 5 ? S.time + ':00' : S.time;
     const {data:slotCheck} = await sb.from('reservations')
       .select('id')
       .eq('date_rdv', dateStr)
-      .eq('heure_rdv', S.time)
+      .eq('heure_rdv', heureCheck)
       .eq('barbier', finalBarber)
       .eq('statut', 'confirmé')
       .maybeSingle();
@@ -1229,7 +1247,7 @@ async function submitBooking(){
 
     const {data:resa,error:re}=await sb.from('reservations').insert({
       client_id:clientId,barbier:finalBarber,service:allSvcNames,prix:allPriceStr,
-      date_rdv:dateStr,heure_rdv:S.time,statut:'confirmé',note_client:note
+      date_rdv:dateStr,heure_rdv:S.time.length===5?S.time+':00':S.time,statut:'confirmé',note_client:note
     }).select('id').single();
     if(re){hideOverlay();showToast('Erreur lors de la réservation. Réessayez.','error');return;}
     resaId = resa.id;
@@ -1573,8 +1591,9 @@ loadBookingServices();
 // Canal Realtime services — créé UNE SEULE FOIS
 sb.channel('booking-services')
   .on('postgres_changes', {event:'*', schema:'public', table:'services'}, () => {
-    console.log('[Realtime] Services modifiés — rechargement');
-    loadBookingServices();
+    console.log('[Realtime] Services modifiés — rechargement durées + affichage');
+    _svcDurLoaded = false; // Forcer rechargement des durées
+    ensureSvcDurLoaded().then(() => loadBookingServices());
   })
   .subscribe();
 
