@@ -2583,7 +2583,7 @@ async function loadCalendrier(dateStr) {
             </div>`;
           } else if(r) {
             const nom = r.clients ? `${r.clients.prenom} ${r.clients.nom}` : '—';
-            const svc = r.service ? r.service.substring(0,28)+(r.service.length>28?'…':'') : '—';
+            const svc = r.service || '—'; // Nom complet, pas de troncature
             const hasPref = r.avec_preference === true;
             const hasNote = !!r.note_client;
             const isNoShow = r.no_show === true;
