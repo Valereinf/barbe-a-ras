@@ -1211,6 +1211,18 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allResa = [], allClients = [], allWaitlist = [];
 let ADMIN_SVC_DUR = {}; // Cache durées services — chargé depuis Supabase
+let _adminSvcDurLoaded = false;
+
+async function ensureAdminSvcDurLoaded() {
+  if(_adminSvcDurLoaded) return;
+  try {
+    const {data} = await sb.from('services').select('nom,duree');
+    if(data) data.forEach(s => { ADMIN_SVC_DUR[s.nom] = s.duree; });
+    _adminSvcDurLoaded = true;
+  } catch(e) {
+    console.error('[ADMIN_SVC_DUR] Erreur:', e);
+  }
+}
 let currentFilter = 'all';
 
 // ═══════════════════════════════════════════
@@ -1338,9 +1350,8 @@ function initRealtime() {
 
 async function loadAll() {
   await loadCollabs(true);
-  // Charger les durées des services depuis Supabase
-  const {data:svcData} = await sb.from('services').select('nom,duree');
-  if(svcData) svcData.forEach(s => { ADMIN_SVC_DUR[s.nom] = s.duree; });
+  // Charger les durées depuis Supabase (via ensureAdminSvcDurLoaded)
+  await ensureAdminSvcDurLoaded();
   await Promise.all([loadReservations(), loadClients(), loadWaitlist(), loadHorairesSalon(), loadHorairesCollab(), loadExceptions()]);
   populateBarbierSelects();
   updateStats();
@@ -2485,6 +2496,8 @@ function localToday() {
 async function loadCalendrier(dateStr) {
   const collabs = await loadCollabs();
   if(!dateStr) dateStr = localToday();
+  // GARANTIR que les durées sont chargées avant tout calcul de créneaux
+  await ensureAdminSvcDurLoaded();
   const picker = document.getElementById('cal-date-picker');
   if(picker) picker.value = dateStr;
   const dt = new Date(dateStr+'T12:00:00');
@@ -2697,6 +2710,24 @@ async function saveResaEdit() {
   // Sauvegarder l'ancienne date AVANT la modification (pour rafraîchir les 2 jours)
   const oldResa = allResa.find(r=>r.id===id);
   const oldDate = oldResa?.date_rdv;
+
+  // ── VÉRIFICATION ANTI-DOUBLE (modification) ──
+  const {data:editSlotCheck} = await sb.from('reservations')
+    .select('id,clients(prenom,nom)')
+    .eq('date_rdv', date)
+    .eq('heure_rdv', heure+':00')
+    .eq('barbier', barbier)
+    .eq('statut', 'confirmé')
+    .neq('id', id) // Exclure la réservation en cours de modification
+    .maybeSingle();
+
+  if(editSlotCheck) {
+    const occupant = editSlotCheck.clients?.prenom
+      ? `${editSlotCheck.clients.prenom} ${editSlotCheck.clients.nom||''}`.trim()
+      : 'un client';
+    showToast(`⚠ Ce créneau est déjà pris par ${occupant}. Choisissez un autre horaire.`, 'error');
+    return;
+  }
 
   // Save to Supabase
   await sb.from('reservations').update({
@@ -3167,6 +3198,50 @@ async function saveNewResa() {
     }
   }
   if(!clientId){ showToast('Impossible de créer ou retrouver le client', 'error'); return; }
+
+  // ── VÉRIFICATION ANTI-DOUBLE (admin) ──
+  const {data:adminSlotCheck} = await sb.from('reservations')
+    .select('id,clients(prenom,nom)')
+    .eq('date_rdv', date)
+    .eq('heure_rdv', time+':00')
+    .eq('barbier', barbier)
+    .eq('statut', 'confirmé')
+    .maybeSingle();
+
+  if(adminSlotCheck) {
+    const occupant = adminSlotCheck.clients?.prenom
+      ? `${adminSlotCheck.clients.prenom} ${adminSlotCheck.clients.nom||''}`.trim()
+      : 'un client';
+    showToast(`⚠ Ce créneau est déjà réservé par ${occupant}. Choisissez un autre horaire.`, 'error');
+    return;
+  }
+
+  // Vérifier aussi les slots couverts par la durée du service
+  const serviceDur = ADMIN_SVC_DUR[service] || 30;
+  const timeM = toMins ? toMins(time) : (parseInt(time.split(':')[0])*60 + parseInt(time.split(':')[1]));
+  const coveredSlots = [];
+  for(let m = timeM + 15; m < timeM + serviceDur; m += 15) {
+    const slotStr = String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0') + ':00';
+    coveredSlots.push(slotStr);
+  }
+  if(coveredSlots.length > 0) {
+    const {data:overlapCheck} = await sb.from('reservations')
+      .select('id,heure_rdv,clients(prenom,nom)')
+      .eq('date_rdv', date)
+      .eq('barbier', barbier)
+      .eq('statut', 'confirmé')
+      .in('heure_rdv', coveredSlots)
+      .limit(1)
+      .maybeSingle();
+    if(overlapCheck) {
+      const occupant = overlapCheck.clients?.prenom
+        ? `${overlapCheck.clients.prenom} ${overlapCheck.clients.nom||''}`.trim()
+        : 'un client';
+      const conflictTime = overlapCheck.heure_rdv?.substring(0,5);
+      showToast(`⚠ Conflit: ${occupant} a déjà un RDV à ${conflictTime} (chevauchement avec ce service de ${serviceDur} min).`, 'error');
+      return;
+    }
+  }
 
   const {data:newResa, error:resaErr} = await sb.from('reservations').insert({
     client_id:clientId, barbier, service, prix,
