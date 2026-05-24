@@ -558,8 +558,32 @@ async function loadBookingCollabs(){
 
 function goStep(n){
   // Gérer le polling: démarrer à l'étape 3, arrêter sinon
-  if(n === 3) startSlotPolling();
-  else stopSlotPolling();
+  if(n === 3) {
+    startSlotPolling();
+  } else {
+    stopSlotPolling();
+    // À l'étape 4 (infos client), vérifier en arrière-plan que le slot est encore libre
+    if(n === 4 && S.date && S.time && S.assignedBarber) {
+      const heureCheck = S.time.length===5 ? S.time+':00' : S.time;
+      const dateCheck = localDateStr(S.date);
+      sb.from('reservations')
+        .select('id')
+        .eq('date_rdv', dateCheck)
+        .eq('heure_rdv', heureCheck)
+        .eq('barbier', S.assignedBarber)
+        .eq('statut', 'confirmé')
+        .maybeSingle()
+        .then(({data}) => {
+          if(data) {
+            // Slot pris pendant que le client remplissait l'étape 3
+            showToast('⚠ Ce créneau vient d\'être réservé. Veuillez choisir un autre horaire.', 'error');
+            S.time = null;
+            S.assignedBarber = null;
+            goStep(3);
+          }
+        });
+    }
+  }
 
   const screens=['sc1','sc2','sc3','sc4','sc5','sc-waitlist','sc-wl-conf'];
   screens.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
@@ -751,21 +775,16 @@ function getAllSlots15(dt, barber) {
 function getBusyIntervals(reservations, serviceDurMap) {
   return reservations.map(r => {
     const start = toMins(r.heure_rdv.substring(0,5));
-    // Chercher la durée: 1) depuis la jointure DB si disponible
-    // 2) depuis SVC_DUR par nom exact 3) par nom nettoyé 4) fallback 30min
-    let dur = r.duree // si jointure disponible
-      || serviceDurMap[r.service] // nom exact
-      || serviceDurMap[r.service?.trim()] // nom avec espaces
-      || (() => {
-          // Cherche un nom similaire (insensible à la casse et accents)
-          const normService = r.service?.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
-          const found = Object.entries(serviceDurMap).find(([k]) =>
-            k.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'') === normService
-          );
-          if(!found) console.warn('[getBusyIntervals] Service inconnu:', r.service, '→ fallback 30min');
-          return found?.[1];
-        })()
+    // PRIORITÉ 1: duree_minutes stockée directement dans la réservation (fiable à 100%)
+    // PRIORITÉ 2: SVC_DUR par nom exact
+    // PRIORITÉ 3: fallback 30min
+    const dur = r.duree_minutes
+      || serviceDurMap[r.service]
+      || serviceDurMap[r.service?.trim()]
       || 30;
+    if(!r.duree_minutes && !serviceDurMap[r.service]) {
+      console.warn('[getBusyIntervals] duree_minutes manquant pour:', r.service, '→ fallback 30min');
+    }
     return { start, end: start + dur };
   });
 }
@@ -965,7 +984,7 @@ async function selDay(d,dt,el){
   const [indiResp, svcDurResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
     sb.from('services').select('nom,duree'), // Toujours recharger les durées à jour
-    ...collabNames.map(nom=>sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier',nom).eq('statut','confirmé'))
+    ...collabNames.map(nom=>sb.from('reservations').select('heure_rdv,service,duree_minutes').eq('date_rdv',dateStr).eq('barbier',nom).eq('statut','confirmé'))
   ]);
 
   // Mettre à jour SVC_DUR avec les données fraîches de la DB
@@ -1295,7 +1314,8 @@ async function submitBooking(){
 
     const {data:resa,error:re}=await sb.from('reservations').insert({
       client_id:clientId,barbier:finalBarber,service:allSvcNames,prix:allPriceStr,
-      date_rdv:dateStr,heure_rdv:S.time.length===5?S.time+':00':S.time,statut:'confirmé',note_client:note
+      date_rdv:dateStr,heure_rdv:S.time.length===5?S.time+':00':S.time,statut:'confirmé',note_client:note,
+      duree_minutes: getTotalDur() || 30
     }).select('id').single();
     if(re){hideOverlay();showToast('Erreur lors de la réservation. Réessayez.','error');return;}
     resaId = resa.id;
