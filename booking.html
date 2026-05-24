@@ -1016,10 +1016,13 @@ async function selDay(d,dt,el){
     }));
 
     const anyAvail = collabAvails.some(ca=>ca.avail.length>0);
-    const availM = collabAvails[0]?.avail||[];
-    const availB = collabAvails[1]?.avail||[];
-    const barbaraBlocked = collabAvails[1]?.blocked??true;
-    const michaelBlocked = collabAvails[0]?.blocked??true;
+    // ✅ Accès par NOM — jamais par index fixe (l'ordre DB peut varier)
+    const cdMichael = collabAvails.find(ca => ca.nom === 'Michael');
+    const cdBarbara = collabAvails.find(ca => ca.nom === 'Barbara Sandra');
+    const availM = cdMichael?.avail || [];
+    const availB = cdBarbara?.avail || [];
+    const michaelBlocked = cdMichael?.blocked ?? true;
+    const barbaraBlocked = cdBarbara?.blocked ?? true;
 
     if(availM.length===0 && availB.length===0){
       document.getElementById('waitlist-banner').style.display='block';return;
@@ -1039,8 +1042,8 @@ async function selDay(d,dt,el){
 
       // ✅ Passer UNIQUEMENT les créneaux disponibles de Michael
       // availM contient déjà les slots vérifiés libres — pas besoin de mSlots complet
-      _lastBusyIntervals = collabAvails[0]?.busy || [];
-      _lastBlockedSlots  = collabAvails[0]?.blockedSlots || [];
+      _lastBusyIntervals = cdMichael?.busy || [];
+      _lastBlockedSlots  = cdMichael?.blockedSlots || [];
       renderSlots(grid, availM, availM, 'Michael', dt, requestedDur);
     } else {
       // Michael a des horaires ce jour mais tout est pris
@@ -1060,8 +1063,8 @@ async function selDay(d,dt,el){
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
 
       // ✅ Passer UNIQUEMENT les créneaux disponibles de Barbara
-      _lastBusyIntervals = collabAvails[1]?.busy || [];
-      _lastBlockedSlots  = collabAvails[1]?.blockedSlots || [];
+      _lastBusyIntervals = cdBarbara?.busy || [];
+      _lastBlockedSlots  = cdBarbara?.blockedSlots || [];
       renderSlots(grid, availB, availB, 'Barbara Sandra', dt, requestedDur);
     } else {
       // Barbara a des horaires ce jour mais tout est pris
