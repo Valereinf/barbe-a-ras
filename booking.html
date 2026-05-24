@@ -751,7 +751,21 @@ function getAllSlots15(dt, barber) {
 function getBusyIntervals(reservations, serviceDurMap) {
   return reservations.map(r => {
     const start = toMins(r.heure_rdv.substring(0,5));
-    const dur = serviceDurMap[r.service] || 30;
+    // Chercher la durée: 1) depuis la jointure DB si disponible
+    // 2) depuis SVC_DUR par nom exact 3) par nom nettoyé 4) fallback 30min
+    let dur = r.duree // si jointure disponible
+      || serviceDurMap[r.service] // nom exact
+      || serviceDurMap[r.service?.trim()] // nom avec espaces
+      || (() => {
+          // Cherche un nom similaire (insensible à la casse et accents)
+          const normService = r.service?.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+          const found = Object.entries(serviceDurMap).find(([k]) =>
+            k.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'') === normService
+          );
+          if(!found) console.warn('[getBusyIntervals] Service inconnu:', r.service, '→ fallback 30min');
+          return found?.[1];
+        })()
+      || 30;
     return { start, end: start + dur };
   });
 }
@@ -948,10 +962,18 @@ async function selDay(d,dt,el){
   const collabs = await loadBookingCollabs();
   const collabNames = collabs.map(c=>c.nom);
 
-  const [indiResp, ...resaResps] = await Promise.all([
+  const [indiResp, svcDurResp, ...resaResps] = await Promise.all([
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
+    sb.from('services').select('nom,duree'), // Toujours recharger les durées à jour
     ...collabNames.map(nom=>sb.from('reservations').select('heure_rdv,service').eq('date_rdv',dateStr).eq('barbier',nom).eq('statut','confirmé'))
   ]);
+
+  // Mettre à jour SVC_DUR avec les données fraîches de la DB
+  if(svcDurResp?.data) {
+    svcDurResp.data.forEach(s => { SVC_DUR[s.nom] = s.duree; });
+    _svcDurLoaded = true;
+    console.log('[selDay] SVC_DUR mis à jour:', Object.keys(SVC_DUR).length, 'services');
+  }
 
   hideOverlay();
   const indis = indiResp.data||[];
