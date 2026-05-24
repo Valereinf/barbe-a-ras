@@ -2532,7 +2532,7 @@ async function loadCalendrier(dateStr) {
     sb.from('indisponibilites').select('*').lte('date_debut',dateStr).gte('date_fin',dateStr),
     sb.from('horaires_collaborateurs').select('*').in('barbier', collabs.map(c=>c.nom)),
     sb.from('horaires_exceptions').select('*').eq('actif',true).lte('date_debut',dateStr).gte('date_fin',dateStr),
-    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,avec_preference,no_show,groupe_id,note_client,clients(prenom,nom)')
+    ...collabs.map(c=>sb.from('reservations').select('id,heure_rdv,service,duree_minutes,avec_preference,no_show,groupe_id,note_client,clients(prenom,nom)')
       .eq('date_rdv',dateStr).eq('barbier',c.nom).eq('statut','confirmé'))
   ]);
   const indis         = indiResp.data||[];
@@ -2570,7 +2570,9 @@ async function loadCalendrier(dateStr) {
     (resaResps[ci]?.data||[]).forEach(r=>{
       const startKey = r.heure_rdv.substring(0,5);
       const startM = toM(startKey);
-      const dur = ADMIN_SVC_DUR[r.service] || 30;
+      // PRIORITÉ: duree_minutes stocké dans la réservation (fiable)
+      // Fallback: ADMIN_SVC_DUR par nom, puis 30min
+      const dur = r.duree_minutes || ADMIN_SVC_DUR[r.service] || ADMIN_SVC_DUR[r.service?.trim()] || 30;
       // Slot de début = le RDV complet
       booked[startKey] = r;
       // Slots suivants couverts = marqués comme bloqués
@@ -3246,7 +3248,8 @@ async function saveNewResa() {
   const {data:newResa, error:resaErr} = await sb.from('reservations').insert({
     client_id:clientId, barbier, service, prix,
     date_rdv:date, heure_rdv:time+':00',
-    statut:'confirmé', note_client:note
+    statut:'confirmé', note_client:note,
+    duree_minutes: ADMIN_SVC_DUR[service] || 30
   }).select('id').single();
 
   if(resaErr) { showToast('Erreur création RDV: '+resaErr.message,'error'); return; }
