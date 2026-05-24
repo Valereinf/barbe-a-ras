@@ -966,24 +966,27 @@ async function selDay(d,dt,el){
   document.getElementById('date-lbl').textContent=dt.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
 
   if(S.barber==='Sans préférence'){
-    // Calculer avail pour chaque collaborateur
+    // ── Calculer les créneaux VRAIMENT disponibles pour chaque barbier ──
     const collabAvails = collabData.map(cd=>({
       ...cd,
       avail: cd.blocked ? [] : getAvailableSlots(dt, cd.busy, requestedDur, cd.blockedSlots, cd.nom),
       busy: cd.busy,
       blockedSlots: cd.blockedSlots
     }));
-    // Trier : premier dispo d'abord (ordre Supabase)
+
     const anyAvail = collabAvails.some(ca=>ca.avail.length>0);
-    // Pour rétrocompatibilité on garde Michael/Barbara mais générique
     const availM = collabAvails[0]?.avail||[];
     const availB = collabAvails[1]?.avail||[];
     const barbaraBlocked = collabAvails[1]?.blocked??true;
     const michaelBlocked = collabAvails[0]?.blocked??true;
+
     if(availM.length===0 && availB.length===0){
       document.getElementById('waitlist-banner').style.display='block';return;
     }
+
     const grid=document.getElementById('time-grid');grid.innerHTML='';
+
+    // ── MICHAEL ──
     if(michaelBlocked){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:0.5rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px';
@@ -992,9 +995,20 @@ async function selDay(d,dt,el){
       const lbl=document.createElement('div');
       lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:0.5rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px';
       lbl.textContent=`✂ Michael — ${availM.length} créneaux disponibles`;grid.appendChild(lbl);
-      const mRange=getBarberDayRange('Michael',dt);const mEnd=mRange?mRange.end:20*60;const mSlots=getAllSlots15(dt,'Michael').filter(t=>toMins(t)+requestedDur<=mEnd);_lastBusyIntervals = collabAvails[0]?.busy || []; _lastBlockedSlots = collabAvails[0]?.blockedSlots || [];
-      renderSlots(grid,mSlots,availM,'Michael',dt,requestedDur);
+
+      // ✅ Passer UNIQUEMENT les créneaux disponibles de Michael
+      // availM contient déjà les slots vérifiés libres — pas besoin de mSlots complet
+      _lastBusyIntervals = collabAvails[0]?.busy || [];
+      _lastBlockedSlots  = collabAvails[0]?.blockedSlots || [];
+      renderSlots(grid, availM, availM, 'Michael', dt, requestedDur);
+    } else {
+      // Michael a des horaires ce jour mais tout est pris
+      const lbl=document.createElement('div');
+      lbl.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim2);padding:0.5rem 0 0.3rem;border-bottom:1px solid rgba(245,240,232,0.1);margin-bottom:2px';
+      lbl.textContent='⏳ Michael — complet pour ce jour';grid.appendChild(lbl);
     }
+
+    // ── BARBARA SANDRA ──
     if(barbaraBlocked){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);padding:1rem 0 0.3rem;border-bottom:1px solid rgba(231,76,60,0.3);margin-bottom:2px;margin-top:0.5rem';
@@ -1003,9 +1017,18 @@ async function selDay(d,dt,el){
       const lbl2=document.createElement('div');
       lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);padding:1rem 0 0.3rem;border-bottom:1px solid var(--gold4);margin-bottom:2px;margin-top:0.5rem';
       lbl2.textContent=`✂ Barbara Sandra — ${availB.length} créneaux disponibles`;grid.appendChild(lbl2);
-      const bRange=getBarberDayRange('Barbara Sandra',dt);const bEnd=bRange?bRange.end:20*60;const bSlots=getAllSlots15(dt,'Barbara Sandra').filter(t=>toMins(t)+requestedDur<=bEnd);_lastBusyIntervals = collabAvails[1]?.busy || []; _lastBlockedSlots = collabAvails[1]?.blockedSlots || [];
-      renderSlots(grid,bSlots,availB,'Barbara Sandra',dt,requestedDur);
+
+      // ✅ Passer UNIQUEMENT les créneaux disponibles de Barbara
+      _lastBusyIntervals = collabAvails[1]?.busy || [];
+      _lastBlockedSlots  = collabAvails[1]?.blockedSlots || [];
+      renderSlots(grid, availB, availB, 'Barbara Sandra', dt, requestedDur);
+    } else {
+      // Barbara a des horaires ce jour mais tout est pris
+      const lbl2=document.createElement('div');
+      lbl2.style.cssText='grid-column:1/-1;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim2);padding:1rem 0 0.3rem;border-bottom:1px solid rgba(245,240,232,0.1);margin-bottom:2px;margin-top:0.5rem';
+      lbl2.textContent='⏳ Barbara Sandra — complète pour ce jour';grid.appendChild(lbl2);
     }
+
     document.getElementById('time-sec').style.display='block';
   } else {
     // Barbier spécifique — utiliser collabData
@@ -1068,8 +1091,11 @@ function renderSlots(grid, allSlots, avail, barber, dt, requestedDur) {
       e.textContent = t;
       e.onclick = () => selTime(e, t, barber);
     } else {
-      e.className = 'time-slot  unavail';
+      // Slot occupé/indisponible: affiché grisé, AUCUN onclick
+      e.className = 'time-slot unavail';
       e.textContent = t;
+      e.style.cssText = 'opacity:0.3;cursor:not-allowed;pointer-events:none;';
+      e.title = 'Créneau non disponible';
     }
     grid.appendChild(e);
   });
