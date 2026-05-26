@@ -1068,16 +1068,7 @@ input[type=time]{color-scheme:dark;-webkit-appearance:none}
       <div class="field">
         <label>Service *</label>
         <select id="new-resa-service" onchange="updatePrix()">
-          <option value="Coupe de cheveux adulte" data-prix="29.50">Coupe de cheveux adulte — 29.50$</option>
-          <option value="Coupe enfant (0-15 ans)" data-prix="27.00">Coupe enfant (0-15 ans) — 27.00$</option>
-          <option value="Cheveux + barbe à la lame serviette chaude" data-prix="56.00">Cheveux + barbe à la lame — 56.00$</option>
-          <option value="Coupe de cheveux long à court" data-prix="47.00">Coupe long à court — 47.00$</option>
-          <option value="Coupe + barbe au clipper" data-prix="47.00">Coupe + barbe au clipper — 47.00$</option>
-          <option value="Coupe + shampoing" data-prix="31.50">Coupe + shampoing — 31.50$</option>
-          <option value="Barbe à la lame + serviettes chaudes" data-prix="29.50">Barbe à la lame — 29.50$</option>
-          <option value="Cheveux + barbe lame + shampoing" data-prix="59.00">Cheveux + barbe lame + shampoing — 59.00$</option>
-          <option value="Coupe adulte hors heures" data-prix="55.00">Coupe adulte hors heures — 55.00$</option>
-          <option value="Coupe + barbe lame hors heures" data-prix="105.00">Coupe + barbe lame hors heures — 105.00$</option>
+          <option value="">Chargement des services...</option>
         </select>
       </div>
       <div class="field"><label>Note <span style="font-size:0.65rem;color:var(--dim2)">(optionnel)</span></label><input type="text" id="new-resa-note" placeholder="Instructions spéciales..."></div>
@@ -3098,6 +3089,7 @@ function openNewResaFromClient(clientId, prenom, nom, tel, email) {
   document.getElementById('new-resa-barbier').value = '';
   // Afficher les champs date/heure/barbier
   document.getElementById('new-resa-dht-fields').style.display = 'block';
+  populateServiceSelect(); // Charger les vrais services depuis Supabase
   document.getElementById('new-resa-date-vis').value = today;
   document.getElementById('new-resa-time-vis').value = '09:00';
   // Peupler le select barbier
@@ -3122,6 +3114,7 @@ function openNewResaFromClient(clientId, prenom, nom, tel, email) {
 function openNewResaModal(dateStr, time, barbier) {
   newResaClientId = null;
   document.getElementById('new-resa-dht-fields').style.display = 'none';
+  populateServiceSelect(); // Charger les vrais services depuis Supabase
   document.getElementById('new-resa-date').value = dateStr;
   document.getElementById('new-resa-time').value = time;
   document.getElementById('new-resa-barbier').value = barbier;
@@ -3164,6 +3157,7 @@ function updatePrix() {
 }
 
 async function saveNewResa() {
+  try {
   // Si ouvert depuis fiche client, lire les champs visibles
   const dhtVisible = document.getElementById('new-resa-dht-fields').style.display !== 'none';
   const date    = dhtVisible ? document.getElementById('new-resa-date-vis').value    : document.getElementById('new-resa-date').value;
@@ -3285,6 +3279,10 @@ async function saveNewResa() {
   closeModal('modal-new-resa');
   loadAll();
   loadCalendrier(date);
+  } catch(err) {
+    console.error('[saveNewResa] Erreur:', err);
+    showToast('Erreur: ' + (err.message || String(err)), 'error');
+  }
 }
 
 function closeModal(id) {
@@ -3933,6 +3931,16 @@ function copyToClipboard(text, msg) {
 // ══════════════════════════════════════
 // SERVICES — CRUD
 // ══════════════════════════════════════
+
+async function populateServiceSelect() {
+  const sel = document.getElementById('new-resa-service');
+  if(!sel) return;
+  const {data} = await sb.from('services').select('nom,prix,duree').eq('actif',true).order('ordre').order('nom');
+  if(!data || data.length === 0) return;
+  sel.innerHTML = data.map(s =>
+    `<option value="${s.nom}" data-prix="${s.prix}" data-duree="${s.duree}">${s.nom} — ${parseFloat(s.prix).toFixed(2)}$</option>`
+  ).join('');
+}
 
 async function loadServices() {
   const tbody = document.getElementById('services-tbody');
