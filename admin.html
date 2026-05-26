@@ -3214,7 +3214,7 @@ async function saveNewResa() {
 
   // Vérifier aussi les slots couverts par la durée du service
   const serviceDur = ADMIN_SVC_DUR[service] || 30;
-  const timeM = toMins ? toMins(time) : (parseInt(time.split(':')[0])*60 + parseInt(time.split(':')[1]));
+  const timeM = (parseInt(time.split(':')[0])*60 + parseInt(time.split(':')[1]));
   const coveredSlots = [];
   for(let m = timeM + 15; m < timeM + serviceDur; m += 15) {
     const slotStr = String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0') + ':00';
