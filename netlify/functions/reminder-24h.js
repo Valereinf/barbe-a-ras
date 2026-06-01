@@ -55,7 +55,7 @@ exports.handler = async () => {
             body: new URLSearchParams({
               From: TWILIO_PHONE.replace(/\s/g,''),
               To: '+1' + tel.slice(-10),
-              Body: `Bonjour ${prenom}! Rappel: RDV chez Barbe-À-Ras DEMAIN ${dateFormatted} à ${heure} avec ${resa.barbier}.${noteStr} Pour annuler (min 24h): (418) 612-2007. Au plaisir! ✂`
+              Body: `Rappel RDV Barbe-A-Ras: DEMAIN ${dateFormatted} a ${heure} avec ${resa.barbier}. Annulation: (418) 612-2007`
             }).toString()
           }
         );
