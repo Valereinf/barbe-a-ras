@@ -42,7 +42,7 @@ exports.handler = async (event) => {
       await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
         method: 'POST',
         headers: { 'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ From: TWILIO_PHONE, To: '+1' + telClean, Body: `Bonjour ${prenom}, vous n'avez pas honoré votre RDV du ${date} chez Barbe-À-Ras. Frais : ${prix} au prochain RDV. Info: (418) 612-2007` }).toString()
+        body: new URLSearchParams({ From: TWILIO_PHONE, To: '+1' + telClean, Body: `Barbe-A-Ras: Absence non honoree le ${date}. Frais: ${prix} au prochain RDV. Tel: (418) 612-2007` }).toString()
       }).catch(()=>{});
     }
     return { statusCode: 200, body: JSON.stringify({ ok: true, type: 'penalty-sent' }) };
@@ -62,7 +62,7 @@ exports.handler = async (event) => {
         method: 'POST',
         headers: { 'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ From: TWILIO_PHONE, To: '+1' + telClean,
-          Body: `Bonjour ${prenom}, votre RDV du ${date} à ${heure} chez Barbe-À-Ras a été annulé. Pour reprendre un RDV: barbe-a-ras.ca/booking. Info: (418) 612-2007`
+          Body: `Barbe-A-Ras: Votre RDV du ${date} a ${heure} a ete annule. Nouveau RDV: barbe-a-ras.ca/booking`
         }).toString()
       }).catch(()=>{});
     }
@@ -135,7 +135,7 @@ exports.handler = async (event) => {
         body: new URLSearchParams({
           From: TWILIO_PHONE,
           To: '+1' + telClean,
-          Body: `Bonjour ${prenom}, votre RDV chez Barbe-A-Ras a ete modifie: ${date} a ${heure} avec ${barbier}. Questions: (418) 612-2007`
+          Body: `Barbe-A-Ras: Votre RDV a ete modifie: ${date} a ${heure} avec ${barbier}`
         }).toString()
       }).catch(()=>{});
     }
@@ -213,7 +213,7 @@ exports.handler = async (event) => {
     await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
       method: 'POST',
       headers: { 'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ From: TWILIO_PHONE, To: '+1' + telClean, Body: `Bonjour ${prenom}! ✅ RDV confirmé chez Barbe-À-Ras le ${date} à ${heure} avec ${barbier}. Annuler: ${cancelUrl}` }).toString()
+      body: new URLSearchParams({ From: TWILIO_PHONE, To: '+1' + telClean, Body: `Barbe-A-Ras RDV confirme: ${date} a ${heure} avec ${barbier}. Detail/annulation: voir votre courriel` }).toString()
     }).catch(()=>{});
   }
 
