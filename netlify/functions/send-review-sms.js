@@ -82,25 +82,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ avis_envoye: true, avis_token: reviewToken })
     });
 
-    // SMS
-    if (tel && TWILIO_SID && TWILIO_TOKEN && TWILIO_PHONE) {
-      const telClean = tel.replace(/\D/g, '').slice(-10);
-      await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            From: TWILIO_PHONE,
-            To: '+1' + telClean,
-            Body: `Bonjour ${prenom}! Merci pour votre visite chez Barbe-A-Ras. Votre avis nous aide a grandir 🙏 ${reviewUrl}`
-          }).toString()
-        }
-      ).catch(e => console.error('SMS error:', e));
-    }
+    // SMS désactivé — décision Barbara
 
     // Email
     if (email && RESEND_API_KEY) {
